@@ -9,18 +9,18 @@ import org.bouncycastle.crypto.params.KeyParameter
 import org.bouncycastle.crypto.params.ParametersWithIV
 import java.security.SecureRandom
 
-actual class CryptoProvider {
+actual class CryptoProviderImpl: CryptoProvider {
     private val secureRandom = SecureRandom()
-    actual fun generateSalt(): ByteArray = secureRandom.generateSeed(64)
+    actual override fun generateSalt(): ByteArray = secureRandom.generateSeed(64)
 
-    actual fun generateKeyByteArray(
+    actual override fun generateKeyByteArray(
         config: SCryptConfig,
         password: ByteArray,
         salt: ByteArray,
         length: Int
     ): ByteArray = SCrypt.generate(password, salt, config.n, config.r, config.p, length)
     
-    actual fun sha512(data: ByteArray): ByteArray {
+    actual override fun sha512(data: ByteArray): ByteArray {
         val digest = SHA512Digest()
         val retValue = ByteArray(digest.digestSize)
         digest.update(data, 0, data.size)
@@ -37,16 +37,16 @@ actual class CryptoProvider {
         return outBuf.copyOfRange(0, actualLength)
     }
     
-    actual fun generateInitializationVector(): ByteArray = secureRandom.generateSeed(16)
+    actual override fun generateInitializationVector(): ByteArray = secureRandom.generateSeed(16)
 
-    actual fun aes256Encrypt(data: ByteArray, key: ByteArray, iv: ByteArray): ByteArray {
+    actual override fun aes256Encrypt(data: ByteArray, key: ByteArray, iv: ByteArray): ByteArray {
         val aes = PaddedBufferedBlockCipher(CBCBlockCipher.newInstance(AESEngine.newInstance()))
         val ivAndKey = ParametersWithIV(KeyParameter(key), iv)
         aes.init(true, ivAndKey)
         return cipherData(aes, data)
     }
 
-    actual fun aes256Decrypt(encrypted: ByteArray, key: ByteArray, iv: ByteArray): ByteArray {
+    actual override fun aes256Decrypt(encrypted: ByteArray, key: ByteArray, iv: ByteArray): ByteArray {
         val aes = PaddedBufferedBlockCipher(CBCBlockCipher.newInstance(AESEngine.newInstance()))
         val ivAndKey = ParametersWithIV(KeyParameter(key), iv)
         aes.init(false, ivAndKey)

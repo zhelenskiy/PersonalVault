@@ -33,6 +33,13 @@ kotlin {
             implementation(compose.ui)
             @OptIn(ExperimentalComposeLibrary::class)
             implementation(compose.components.resources)
+            implementation(libs.voyager.navigator)
+            implementation(libs.voyager.screenModel)
+            implementation(libs.voyager.transitions)
+            implementation(libs.voyager.kodein)
+            implementation(libs.kodein)
+            implementation(libs.kodein.compose)
+            implementation(libs.kotlin.collections.immutable)
         }
         desktopMain.dependencies {
             implementation(compose.desktop.currentOs)

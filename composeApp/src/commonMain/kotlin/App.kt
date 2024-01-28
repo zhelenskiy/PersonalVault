@@ -1,24 +1,23 @@
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
-import startScreen.EncryptedSpaceInfo
-import startScreen.SpacesScreen
+import cafe.adriel.voyager.navigator.Navigator
+import cafe.adriel.voyager.transitions.SlideTransition
 import crypto.*
-import startScreen.DecryptedSpaceInfo
+import org.kodein.di.DI
+import org.kodein.di.bindSingleton
+import org.kodein.di.compose.withDI
+import startScreen.*
+
+val rootDI = DI {
+    import(spaceListModule)
+    bindSingleton<CryptoProvider> { CryptoProviderImpl() }
+}
 
 @Composable
-fun App() {
+fun App() = withDI(rootDI) {
     MaterialTheme {
-        var spaces by remember { mutableStateOf(listOf<EncryptedSpaceInfo>()) }
-        val cryptoProvider = remember { CryptoProvider() }
-        var currentDecryptedSpaceInfo by remember { mutableStateOf<DecryptedSpaceInfo?>(null) }
-        SpacesScreen(
-            cryptoProvider = cryptoProvider,
-            spaces = spaces,
-            onSpacesChange = { spaces = it },
-            onSpaceOpen = { currentDecryptedSpaceInfo = it },
-        )
-        LaunchedEffect(currentDecryptedSpaceInfo) {
-            currentDecryptedSpaceInfo?.let { println("Space ${it.name} opened: ${it.decryptedData.decodeToString()}") }
+        Navigator(SpaceListScreen()) { navigator ->
+            SlideTransition(navigator)
         }
     }
 }

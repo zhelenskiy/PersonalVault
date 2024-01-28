@@ -24,7 +24,7 @@ class SCryptConfig(
 
 val defaultSCryptConfig = SCryptConfig(32768, 32, 1)
 
-expect class CryptoProvider() {
+interface CryptoProvider {
     fun generateSalt(): ByteArray
     fun generateKeyByteArray(config: SCryptConfig, password: ByteArray, salt: ByteArray, length: Int): ByteArray
 
@@ -32,6 +32,16 @@ expect class CryptoProvider() {
     fun aes256Encrypt(data: ByteArray, key: ByteArray, iv: ByteArray): ByteArray
     fun aes256Decrypt(encrypted: ByteArray, key: ByteArray, iv: ByteArray): ByteArray
     fun generateInitializationVector(): ByteArray
+}
+
+expect class CryptoProviderImpl(): CryptoProvider {
+    override fun generateSalt(): ByteArray
+    override fun generateKeyByteArray(config: SCryptConfig, password: ByteArray, salt: ByteArray, length: Int): ByteArray
+
+    override fun sha512(data: ByteArray): ByteArray
+    override fun aes256Encrypt(data: ByteArray, key: ByteArray, iv: ByteArray): ByteArray
+    override fun aes256Decrypt(encrypted: ByteArray, key: ByteArray, iv: ByteArray): ByteArray
+    override fun generateInitializationVector(): ByteArray
 }
 
 class PrivateKey(
