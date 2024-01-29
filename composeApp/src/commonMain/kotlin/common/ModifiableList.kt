@@ -33,7 +33,39 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
-import common.NativeDialog
+
+@Composable
+fun ModifiableListItemDecoration(
+    onChangeItemRequest: @Composable() ((onEnd: () -> Unit) -> Unit)? = null,
+    onDeleteItemRequest: @Composable() ((onEnd: () -> Unit) -> Unit)? = null,
+) {
+    var changeIsActive by rememberSaveable { mutableStateOf(false) }
+    var deleteIsActive by rememberSaveable { mutableStateOf(false) }
+
+    if (onChangeItemRequest != null) {
+        IconButton(
+            onClick = { changeIsActive = true },
+            modifier = Modifier
+        ) {
+            Icon(Icons.Default.Edit, "Edit")
+        }
+        if (changeIsActive) {
+            onChangeItemRequest(onEnd = { changeIsActive = false })
+        }
+    }
+
+    if (onDeleteItemRequest != null) {
+        IconButton(
+            onClick = { deleteIsActive = true },
+            modifier = Modifier
+        ) {
+            Icon(Icons.Default.Delete, "Delete")
+        }
+        if (deleteIsActive) {
+            onDeleteItemRequest(onEnd = { deleteIsActive = false })
+        }
+    }
+}
 
 
 @Composable
@@ -44,7 +76,7 @@ fun <T> ModifiableList(
     onChangeItemRequest: (@Composable (index: Int, item: T, onEnd: () -> Unit) -> Unit)? = null,
     onDeleteItemRequest: (@Composable (index: Int, item: T, onEnd: () -> Unit) -> Unit)? = null,
     onItemClick: @Composable ((index: Int, item: T, onEnd: () -> Unit) -> Unit)? = null,
-    content: @Composable RowScope.(index: Int, item: T) -> Unit
+    content: @Composable RowScope.(index: Int, item: T) -> Unit,
 ) {
     val lazyListState = rememberLazyListState()
     Box {
@@ -63,8 +95,6 @@ fun <T> ModifiableList(
 
             itemsIndexed(items) { index, item ->
                 val shape = MaterialTheme.shapes.large
-                var changeIsActive by rememberSaveable { mutableStateOf(false) }
-                var deleteIsActive by rememberSaveable { mutableStateOf(false) }
                 var clickIsActive by rememberSaveable { mutableStateOf(false) }
                 Card(
                     shape = shape,
@@ -79,32 +109,11 @@ fun <T> ModifiableList(
                             .padding(horizontal = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-
                         content(index, item)
-
-                        if (onChangeItemRequest != null) {
-                            IconButton(
-                                onClick = { changeIsActive = true },
-                                modifier = Modifier
-                            ) {
-                                Icon(Icons.Default.Edit, "Edit")
-                            }
-                            if (changeIsActive) {
-                                onChangeItemRequest(index, item, onEnd = { changeIsActive = false })
-                            }
-                        }
-
-                        if (onDeleteItemRequest != null) {
-                            IconButton(
-                                onClick = { deleteIsActive = true },
-                                modifier = Modifier
-                            ) {
-                                Icon(Icons.Default.Delete, "Delete")
-                            }
-                            if (deleteIsActive) {
-                                onDeleteItemRequest(index, item, onEnd = { deleteIsActive = false })
-                            }
-                        }
+                        ModifiableListItemDecoration(
+                            onChangeItemRequest = onChangeItemRequest?.let { { onEnd -> onChangeItemRequest(index, item, onEnd) } },
+                            onDeleteItemRequest = onDeleteItemRequest?.let { { onEnd -> onDeleteItemRequest(index, item, onEnd) } },
+                        )
 
                         if (onItemClick != null && clickIsActive) {
                             onItemClick(index, item, onEnd = { clickIsActive = false })
@@ -243,10 +252,13 @@ fun RowScope.CardTextField(
                         unfocusedIndicatorColor = Color.Transparent,
                         errorIndicatorColor = Color.Transparent,
                         disabledIndicatorColor = Color.Transparent,
+                        focusedContainerColor = Color.Transparent,
+                        unfocusedContainerColor = Color.Transparent,
+                        errorContainerColor = Color.Transparent,
+                        disabledContainerColor = Color.Transparent,
                     ),
                     contentPadding = TextFieldDefaults.contentPaddingWithoutLabel(
-                        start = 8.dp,
-                        end = 8.dp,
+                        start = 8.dp, end = 8.dp, top = 0.dp, bottom = 0.dp,
                     ),
                 )
             }

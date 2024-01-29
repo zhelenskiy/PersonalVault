@@ -40,6 +40,8 @@ kotlin {
             implementation(libs.kodein)
             implementation(libs.kodein.compose)
             implementation(libs.kotlin.collections.immutable)
+            implementation(libs.richeditor)
+            implementation(compose.materialIconsExtended)
         }
         desktopMain.dependencies {
             implementation(compose.desktop.currentOs)
