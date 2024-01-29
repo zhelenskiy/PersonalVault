@@ -419,10 +419,10 @@ fun OpenSpaceDialog(
     onDismissRequest: () -> Unit,
     openSpace: (privateKey: DecryptedSpaceInfo) -> Unit,
 ) {
-    var extraHight by rememberSaveable { mutableStateOf(0.dp) }
+    var extraHeight by remember { mutableStateOf(0.dp) }
     NativeDialog(
         title = "Open space \"${spaceInfo.name}\"",
-        size = DpSize(400.dp, 135.dp + extraHight),
+        size = DpSize(400.dp, 135.dp + extraHeight),
         onDismissRequest = onDismissRequest,
     ) {
         Box {
@@ -452,7 +452,7 @@ fun OpenSpaceDialog(
 
                 AnimatedVisibility(
                     showWrongPassword,
-                    modifier = Modifier.onSizeChanged { extraHight = density.run { it.height.toDp() } }) {
+                    modifier = Modifier.onSizeChanged { extraHeight = density.run { it.height.toDp() } }) {
                     Text("Incorrect password", color = MaterialTheme.colorScheme.error)
                 }
 
