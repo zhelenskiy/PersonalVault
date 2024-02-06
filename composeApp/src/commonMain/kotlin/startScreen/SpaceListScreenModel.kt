@@ -1,7 +1,9 @@
 package startScreen
 
 import cafe.adriel.voyager.core.model.ScreenModel
+import common.EncryptedSpaceInfo
 import crypto.CryptoProvider
+import crypto.PrivateKey
 import kotlinx.collections.immutable.PersistentList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -9,6 +11,7 @@ import kotlinx.coroutines.flow.StateFlow
 import org.kodein.di.DI
 import org.kodein.di.bindProvider
 import org.kodein.di.instance
+import repositories.SpacesRepository
 
 val spaceListModule = DI.Module(name = "SpaceList") {
     bindProvider { SpaceListScreenModel(di) }
@@ -16,9 +19,10 @@ val spaceListModule = DI.Module(name = "SpaceList") {
 
 class SpaceListScreenModel(di: DI) : ScreenModel {
     val cryptoProvider by di.instance<CryptoProvider>()
-    private val spacesImpl: MutableStateFlow<PersistentList<EncryptedSpaceInfo>> = MutableStateFlow(persistentListOf())
+    private val spacesRepository by di.instance<SpacesRepository>()
+
     fun setSpaces(spaces: PersistentList<EncryptedSpaceInfo>) {
-        this.spacesImpl.value = spaces
+        spacesRepository.updateSpaces { spaces }
     }
-    val spaces: StateFlow<PersistentList<EncryptedSpaceInfo>> get() = spacesImpl
+    val spaces: StateFlow<PersistentList<EncryptedSpaceInfo>> get() = spacesRepository.spacesFlow
 }

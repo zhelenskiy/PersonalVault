@@ -24,12 +24,15 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.*
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
@@ -50,7 +53,7 @@ fun ModifiableListItemDecoration(
             Icon(Icons.Default.Edit, "Edit")
         }
         if (changeIsActive) {
-            onChangeItemRequest(onEnd = { changeIsActive = false })
+            onChangeItemRequest { changeIsActive = false }
         }
     }
 
@@ -62,7 +65,7 @@ fun ModifiableListItemDecoration(
             Icon(Icons.Default.Delete, "Delete")
         }
         if (deleteIsActive) {
-            onDeleteItemRequest(onEnd = { deleteIsActive = false })
+            onDeleteItemRequest { deleteIsActive = false }
         }
     }
 }
@@ -116,7 +119,7 @@ fun <T> ModifiableList(
                         )
 
                         if (onItemClick != null && clickIsActive) {
-                            onItemClick(index, item, onEnd = { clickIsActive = false })
+                            onItemClick(index, item) { clickIsActive = false }
                         }
                     }
                 }
@@ -133,7 +136,7 @@ fun <T> ModifiableList(
                         Icon(Icons.Default.Add, "Create")
                     }
                     if (creatingIsActive) {
-                        onCreateItemRequest(onEnd = { creatingIsActive = false })
+                        onCreateItemRequest { creatingIsActive = false }
                     }
                 }
             }
@@ -208,13 +211,20 @@ fun RowScope.CardTextField(
     val interactionSource = remember { MutableInteractionSource() }
     val enabled = true
     val singleLine = true
-    Box(Modifier.weight(1f)) {
+    Box(Modifier.weight(1f).padding(start = 8.dp)) {
+        val textMeasurer = rememberTextMeasurer()
+        var width by remember { mutableStateOf(0) }
+        val textStyle = MaterialTheme.typography.titleMedium
+        val density = LocalDensity.current
+        val emptyText = "Untitled"
+        LaunchedEffect(value) {
+            width = textMeasurer.measure(value.ifEmpty { emptyText }, textStyle).size.width
+        }
         BasicTextField(
             value = value,
             onValueChange = onValueChange,
             modifier = Modifier
-                .horizontalScroll(rememberScrollState())
-                .width(IntrinsicSize.Min)
+                .width(density.run { width.toDp() + 4.dp })
                 .onKeyEvent {
                     if (!it.isAltPressed && !it.isCtrlPressed && !it.isShiftPressed && !it.isMetaPressed && it.key == Key.Escape && it.type == KeyEventType.KeyDown) {
                         keyboardController?.hide()
@@ -222,7 +232,7 @@ fun RowScope.CardTextField(
                     }
                     false
                 },
-            textStyle = MaterialTheme.typography.titleMedium,
+            textStyle = textStyle,
             keyboardOptions = KeyboardOptions(
                 capitalization = KeyboardCapitalization.Sentences,
                 autoCorrect = true,
@@ -242,7 +252,7 @@ fun RowScope.CardTextField(
                 TextFieldDefaults.DecorationBox(
                     value = value,
                     innerTextField = innerTextField,
-                    placeholder = { Text("Untitled") },
+                    placeholder = { Text(emptyText) },
                     interactionSource = interactionSource,
                     enabled = enabled,
                     singleLine = singleLine,
@@ -258,7 +268,7 @@ fun RowScope.CardTextField(
                         disabledContainerColor = Color.Transparent,
                     ),
                     contentPadding = TextFieldDefaults.contentPaddingWithoutLabel(
-                        start = 8.dp, end = 8.dp, top = 0.dp, bottom = 0.dp,
+                        start = 0.dp, end = 0.dp, top = 0.dp, bottom = 0.dp,
                     ),
                 )
             }

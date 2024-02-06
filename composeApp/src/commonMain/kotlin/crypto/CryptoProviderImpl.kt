@@ -1,13 +1,15 @@
 package crypto
 
+import cafe.adriel.voyager.core.lifecycle.JavaSerializable
+
 /**
  * SCrypt configuration (see https://en.wikipedia.org/wiki/Scrypt).
  */
-class SCryptConfig(
+data class SCryptConfig(
     val n: Int,
     val r: Int,
     val p: Int,
-) {
+) : JavaSerializable {
     private tailrec fun Int.isPowerOfTwo(): Boolean = when {
         this == 1 -> true
         this > 1 && this % 2 == 0 -> (this / 2).isPowerOfTwo()
@@ -49,7 +51,7 @@ class PrivateKey(
     val key: ByteArray,
     val salt: ByteArray,
     val hash: ByteArray,
-) {
+): JavaSerializable {
     private val publicKey = PublicKey(config, key.size, salt, hash)
     fun toPublicKey() = publicKey
 }
@@ -59,7 +61,7 @@ class PublicKey(
     val keyLength: Int,
     val salt: ByteArray,
     val hash: ByteArray,
-) {
+): JavaSerializable {
     fun toPrivate(cryptoProvider: CryptoProvider, password: ByteArray): PrivateKey? {
         val keyByteArray =cryptoProvider.generateKeyByteArray(config = config, password = password, salt = salt, length = keyLength)
         val keyHash = cryptoProvider.sha512(salt + keyByteArray)
@@ -79,7 +81,7 @@ fun CryptoProvider.generateKey(config: SCryptConfig, password: ByteArray): Priva
 class EncryptedData(
     val initializationVector: ByteArray,
     val encryptedBytes: ByteArray,
-)
+) : JavaSerializable
 
 fun CryptoProvider.encryptData(data: ByteArray, privateKey: PrivateKey): EncryptedData {
     val iv = generateInitializationVector()

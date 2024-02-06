@@ -49,7 +49,7 @@ class SpaceListScreen : Screen {
             cryptoProvider = screenModel.cryptoProvider,
             spaces = spaces,
             onSpacesChange = screenModel::setSpaces,
-            onSpaceOpen = { navigator += SpaceScreen(it) },
+            onSpaceOpen = { index, privateKey -> navigator += SpaceScreen(index, privateKey) },
         )
     }
 }
@@ -60,7 +60,7 @@ fun SpaceListScreenContent(
     cryptoProvider: CryptoProvider,
     spaces: PersistentList<EncryptedSpaceInfo>,
     onSpacesChange: (list: PersistentList<EncryptedSpaceInfo>) -> Unit,
-    onSpaceOpen: (DecryptedSpaceInfo) -> Unit
+    onSpaceOpen: (index: Int, privateKey: PrivateKey) -> Unit
 ) {
     Scaffold(
         topBar = {
@@ -75,7 +75,7 @@ fun SpaceListScreenContent(
             )
         }
     ) { paddingValues ->
-        Box(Modifier.padding(paddingValues)) {
+        Box(Modifier.windowInsetsPadding(WindowInsets.ime).padding(paddingValues)) {
             ModifiableList(
                 items = spaces,
                 onEmptyContent = { Text("No spaces yet") },
@@ -104,12 +104,12 @@ fun SpaceListScreenContent(
                         closeDialog = onClose,
                     )
                 },
-                onItemClick = { _, space, onClose ->
+                onItemClick = { index, space, onClose ->
                     OpenSpaceDialog(
                         cryptoProvider = cryptoProvider,
                         spaceInfo = space,
                         onDismissRequest = onClose,
-                        openSpace = onSpaceOpen,
+                        onPrivateKeyReceived = { onSpaceOpen(index, it) },
                     )
                 },
             ) { index, space ->
@@ -144,7 +144,7 @@ fun NewSpaceDialog(
         var name by rememberSaveable { mutableStateOf("") }
         var password by rememberSaveable { mutableStateOf("") }
         var passwordCopy by rememberSaveable { mutableStateOf("") }
-        val nameIsCorrect = name.isNotBlank()
+        val nameIsCorrect = true // name.isNotBlank() // uncomment it to validate it here. Also, implement it for renaming then.
         val passwordIsCorrect = password.length >= minPasswordLength
         val passwordCopyIsCorrect = password == passwordCopy
         val isCorrect = passwordCopyIsCorrect && passwordIsCorrect && nameIsCorrect
@@ -215,9 +215,8 @@ fun NewSpaceDialog(
                                     cryptoProvider.generateKey(defaultSCryptConfig, password.toByteArray())
                                 }
                                 yield()
-                                val data = "cat".toByteArray()
                                 val space = withContext(Dispatchers.Default) {
-                                    EncryptedSpaceInfo.fromDecryptedData(name, key, data, cryptoProvider)
+                                    SpaceStructure().toEncryptedBytes(name, key, cryptoProvider)
                                 }
                                 yield()
                                 addSpace(space)
@@ -345,7 +344,12 @@ fun EditSpaceDialog(
                                     }
                                     yield()
                                     val encryptedSpaceInfo = withContext(Dispatchers.Default) {
-                                        EncryptedSpaceInfo.fromDecryptedData(oldSpaceInfo.name, newKey, data, cryptoProvider)
+                                        EncryptedSpaceInfo.fromDecryptedData(
+                                            oldSpaceInfo.name,
+                                            newKey,
+                                            data,
+                                            cryptoProvider
+                                        )
                                     }
                                     yield()
                                     replaceSpace(encryptedSpaceInfo)
@@ -417,7 +421,7 @@ fun OpenSpaceDialog(
     cryptoProvider: CryptoProvider,
     spaceInfo: EncryptedSpaceInfo,
     onDismissRequest: () -> Unit,
-    openSpace: (privateKey: DecryptedSpaceInfo) -> Unit,
+    onPrivateKeyReceived: (privateKey: PrivateKey) -> Unit,
 ) {
     var extraHeight by remember { mutableStateOf(0.dp) }
     NativeDialog(
@@ -472,13 +476,13 @@ fun OpenSpaceDialog(
                         coroutineScope.launch {
                             try {
                                 isLoading = true
-                                val space = withContext(Dispatchers.Default) {
-                                    spaceInfo.toDecryptedSpaceInfo(cryptoProvider, password.toByteArray())
+                                val key = withContext(Dispatchers.Default) {
+                                    spaceInfo.publicKey.toPrivate(cryptoProvider, password.toByteArray())
                                 }
-                                if (space == null) {
+                                if (key == null) {
                                     showWrongPassword = true
                                 } else {
-                                    openSpace(space)
+                                    onPrivateKeyReceived(key)
                                     onDismissRequest()
                                 }
                             } finally {

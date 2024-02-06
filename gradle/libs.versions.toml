@@ -21,6 +21,9 @@ kodein = "7.21.1"
 kodein-compose = "7.19.0"
 kotlin-collections-immutable = "0.3.7"
 richeditor = "1.0.0-rc01"
+serialialization = "1.6.2"
+markdown = "0.5.0"
+color-picker = "0.7.0"
 
 [libraries]
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
@@ -46,10 +49,13 @@ voyager-kodein = { module = "cafe.adriel.voyager:voyager-kodein", version.ref = 
 kodein = { module = "org.kodein.di:kodein-di", version.ref = "kodein" }
 kodein-compose = { module = "org.kodein.di:kodein-di-framework-compose", version.ref = "kodein-compose" }
 kotlin-collections-immutable = { module = "org.jetbrains.kotlinx:kotlinx-collections-immutable", version.ref = "kotlin-collections-immutable" }
-richeditor = { module = "com.mohamedrejeb.richeditor:richeditor-compose", version.ref = "richeditor" }
+serialization = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialialization" }
+markdown = { module = "org.jetbrains:markdown", version.ref = "markdown" }
+color-picker = { module = "com.godaddy.android.colorpicker:compose-color-picker", version.ref = "color-picker" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }
 androidLibrary = { id = "com.android.library", version.ref = "agp" }
 jetbrainsCompose = { id = "org.jetbrains.compose", version.ref = "compose-plugin" }
 kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
+serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
