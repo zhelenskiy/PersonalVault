@@ -6,7 +6,10 @@ import androidx.compose.ui.window.application
 import editor.FxEventLoopReactivizer
 import editor.LocalWindow
 import editor.fakeWebView
+import org.jetbrains.compose.resources.ExperimentalResourceApi
+import org.jetbrains.compose.resources.painterResource
 
+@OptIn(ExperimentalResourceApi::class)
 fun main() = application {
     val fxEventLoopReactivizer = remember {
         FxEventLoopReactivizer(start = true)
@@ -14,6 +17,7 @@ fun main() = application {
     Window(
         onCloseRequest = { exitApplication(); fxEventLoopReactivizer.finish() },
         title = "PersonalVault",
+        icon = painterResource("encrypted.xml"),
     ) {
         CompositionLocalProvider(LocalWindow provides window) {
             App()
