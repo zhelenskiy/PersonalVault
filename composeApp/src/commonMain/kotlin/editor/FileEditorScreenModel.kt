@@ -15,7 +15,6 @@ import org.kodein.di.DI
 import org.kodein.di.bindFactory
 import org.kodein.di.instance
 import repositories.SpacesRepository
-import kotlin.coroutines.EmptyCoroutineContext
 
 
 val fileEditorModule = DI.Module("FileEditorScreenModel") {
@@ -35,15 +34,14 @@ class FileEditorScreenModel(di: DI, editorScreenInfo: FileEditorScreenInfo) : Sc
     private val fileId = editorScreenInfo.fileId
     private val cryptoProvider by di.instance<CryptoProvider>()
     private val spacesRepository by di.instance<SpacesRepository>()
-    private val spaceSavingScope = CoroutineScope(EmptyCoroutineContext)
+    private val savingScope get() = spacesRepository.spacesSavingScope
 
     private val savingCount = MutableStateFlow(0)
 
     private val fileSystemFlowImpl = MutableStateFlow<File?>(null).apply {
-        spaceSavingScope.launch {
+        savingScope.launch {
             value = getFile()
-        }
-        spaceSavingScope.launch {
+
             collectLatest { newFile ->
                 if (newFile != null) {
                     try {
@@ -61,7 +59,7 @@ class FileEditorScreenModel(di: DI, editorScreenInfo: FileEditorScreenInfo) : Sc
 
     val isSaving = savingCount
         .mapLatest { it > 0 }
-        .stateIn(spaceSavingScope, WhileSubscribed(), false)
+        .stateIn(savingScope, WhileSubscribed(), false)
 
     private fun updateFileInRepository(newFile: File?) {
         spacesRepository.updateSpaces {

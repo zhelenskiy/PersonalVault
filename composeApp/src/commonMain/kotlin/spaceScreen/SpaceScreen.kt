@@ -39,6 +39,7 @@ class SpaceScreen(private val index: Int, private val cryptoKey: PrivateKey) : S
         val screenModel = rememberScreenModel<_, SpaceScreenModel>(arg = SpaceScreenInfo(index, cryptoKey))
         val spaceStructure by screenModel.spaceFileSystemFlow.collectAsState()
         val name by screenModel.spaceNameFlow.collectAsState()
+        val isSaving by screenModel.isSaving.collectAsState()
         SpaceScreenContent(
             name = name,
             onNameChange = screenModel::setName,
@@ -46,6 +47,7 @@ class SpaceScreen(private val index: Int, private val cryptoKey: PrivateKey) : S
             onSpaceStructureChange = screenModel::setSpaceStructure,
             onBackPress = { navigator.pop() },
             onFileOpen = { navigator += FileEditorScreen(index, cryptoKey, it) },
+            isSaving = isSaving,
         )
     }
 }
@@ -56,7 +58,8 @@ fun SpaceScreenContent(
     name: String, onNameChange: (String) -> Unit,
     spaceStructure: SpaceStructure?, onSpaceStructureChange: (SpaceStructure) -> Unit,
     onBackPress: () -> Unit,
-    onFileOpen: (FileId) -> Unit
+    onFileOpen: (FileId) -> Unit,
+    isSaving: Boolean,
 ) {
     Scaffold(
         topBar = {
@@ -73,7 +76,12 @@ fun SpaceScreenContent(
                             contentDescription = "Back to space list"
                         )
                     }
-                }
+                },
+                actions = {
+                    if (isSaving) {
+                        SyncIndicator()
+                    }
+                },
             )
         }
     ) { paddingValues ->
@@ -105,7 +113,13 @@ fun SpaceScreenContent(
                 }
                 Box(Modifier.fillMaxWidth(), Alignment.Center) {
                     CreateFileSystemItemButton(spaceStructure.files) { newItem, newFiles ->
-                        onSpaceStructureChange(SpaceStructure(FileSystemItem.Root(spaceStructure.fileStructure.children.add(newItem)), newFiles))
+                        onSpaceStructureChange(
+                            SpaceStructure(
+                                FileSystemItem.Root(
+                                    spaceStructure.fileStructure.children.add(newItem)
+                                ), newFiles
+                            )
+                        )
                     }
                 }
             }
@@ -256,7 +270,10 @@ fun FileSystem(
         )
 
         CreateFileSystemItemButton(files) { newItem, newFiles ->
-            onChange(FileSystemItem.Directory(element.name, element.children.add(newItem), element.isCollapsed), newFiles)
+            onChange(
+                FileSystemItem.Directory(element.name, element.children.add(newItem), element.isCollapsed),
+                newFiles
+            )
         }
 
         ModifiableListItemDecoration(
@@ -303,7 +320,8 @@ fun FileSystem(
     }
 }
 
-private fun generateFileId(files: PersistentMap<FileId, File>): FileId = generateSequence { FileId(Random.nextLong()) }.first { it !in files }
+private fun generateFileId(files: PersistentMap<FileId, File>): FileId =
+    generateSequence { FileId(Random.nextLong()) }.first { it !in files }
 
 @Composable
 private fun CreateFileSystemItemButton(

@@ -19,10 +19,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextRange
@@ -34,8 +31,6 @@ import androidx.compose.ui.text.input.getSelectedText
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Popup
-import cafe.adriel.voyager.core.lifecycle.JavaSerializable
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.kodein.rememberScreenModel
 import cafe.adriel.voyager.navigator.LocalNavigator
@@ -95,19 +90,7 @@ fun FileEditorScreenContent(
                 },
                 actions = {
                     if (isSaving) {
-                        val infiniteTransition = rememberInfiniteTransition()
-                        val rotation by infiniteTransition.animateFloat(
-                            initialValue = 0f,
-                            targetValue = 360f,
-                            animationSpec = infiniteRepeatable(
-                                tween(300, easing = LinearEasing),
-                            ),
-                        )
-                        Icon(
-                            Icons.Default.Sync,
-                            contentDescription = "Saving",
-                            modifier = Modifier.rotate(rotation)
-                        )
+                        SyncIndicator()
                     }
 
                     IconButton(onClick = onHomePress) {

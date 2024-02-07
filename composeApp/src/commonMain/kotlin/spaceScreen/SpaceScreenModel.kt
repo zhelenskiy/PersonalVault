@@ -12,7 +12,6 @@ import org.kodein.di.DI
 import org.kodein.di.bindFactory
 import org.kodein.di.instance
 import repositories.SpacesRepository
-import kotlin.coroutines.EmptyCoroutineContext
 
 
 val spaceModule = DI.Module("SpaceScreenModel") {
@@ -31,20 +30,56 @@ class SpaceScreenModel(di: DI, spaceScreenInfo: SpaceScreenInfo) : ScreenModel {
     private val cryptoProvider by di.instance<CryptoProvider>()
     private val spacesRepository by di.instance<SpacesRepository>()
 
-    private val spaceSavingScope = CoroutineScope(EmptyCoroutineContext)
+    private val savingScope get() = spacesRepository.spacesSavingScope
 
-    val spaceNameFlow: StateFlow<String> = spacesRepository.spacesFlow
-        .mapLatest { it[spaceIndex].name }
-        .stateIn(spaceSavingScope, WhileSubscribed(), "")
+    private val spaceNameFlowImpl = MutableStateFlow("").apply {
+        savingScope.launch {
+            val spaces = spacesRepository.getCurrentSpaces()
+            value = spaces[spaceIndex].name
 
-    val spaceFileSystemFlow: StateFlow<SpaceStructure?> = spacesRepository.spacesFlow
-        .mapLatest { spaces ->
-            val space = spaces[spaceIndex]
-            SpaceStructure.fromEncryptedBytes(cryptoProvider, space, privateKey)
+            collectLatest {
+                try {
+                    savingCount.value++
+                    updateSpaceNameInRepository(it)
+                } catch (e: Throwable) {
+                    e.printStackTrace()
+                } finally {
+                    savingCount.value--
+                }
+            }
         }
-        .stateIn(spaceSavingScope, WhileSubscribed(), null)
+    }
+
+    val spaceNameFlow: StateFlow<String> get() = spaceNameFlowImpl
+    private val savingCount = MutableStateFlow(0)
+
+    private val spaceFileSystemFlowImpl: MutableStateFlow<SpaceStructure?> = MutableStateFlow<SpaceStructure?>(null).apply {
+        savingScope.launch {
+            val spaces = spacesRepository.getCurrentSpaces()
+            val space = spaces[spaceIndex]
+            value = SpaceStructure.fromEncryptedBytes(cryptoProvider, space, privateKey)
+
+            collectLatest { newSpaceStucture ->
+                if (newSpaceStucture != null) {
+                    try {
+                        savingCount.value++
+                        updateSpaceInRepository(newSpaceStucture)
+                    } catch (e: Throwable) {
+                        e.printStackTrace()
+                    } finally {
+                        savingCount.value--
+                    }
+                }
+            }
+        }
+    }
+    val spaceFileSystemFlow: StateFlow<SpaceStructure?> get() = spaceFileSystemFlowImpl
 
     fun setName(name: String) {
+        spaceNameFlowImpl.value = name
+    }
+
+    private fun updateSpaceNameInRepository(name: String) {
         spacesRepository.updateSpaces {
             val oldSpace = it[spaceIndex]
             val newSpace = EncryptedSpaceInfo(name, oldSpace.publicKey, oldSpace.encryptedData)
@@ -52,7 +87,15 @@ class SpaceScreenModel(di: DI, spaceScreenInfo: SpaceScreenInfo) : ScreenModel {
         }
     }
 
+    val isSaving = savingCount
+        .mapLatest { it > 0 }
+        .stateIn(savingScope, WhileSubscribed(), false)
+
     fun setSpaceStructure(newSpaceStructure: SpaceStructure) {
+        spaceFileSystemFlowImpl.value = newSpaceStructure
+    }
+
+    private fun updateSpaceInRepository(newSpaceStructure: SpaceStructure) {
         spacesRepository.updateSpaces {
             val name = it[spaceIndex].name
             val newEncryptedSpace = newSpaceStructure.toEncryptedBytes(name, privateKey, cryptoProvider)

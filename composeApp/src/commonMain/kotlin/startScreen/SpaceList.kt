@@ -45,11 +45,13 @@ class SpaceListScreen : Screen {
         val screenModel = rememberScreenModel<SpaceListScreenModel>()
         val spaces by screenModel.spaces.collectAsState()
         val navigator = LocalNavigator.currentOrThrow
+        val isSaving by screenModel.isSaving.collectAsState()
         SpaceListScreenContent(
             cryptoProvider = screenModel.cryptoProvider,
             spaces = spaces,
             onSpacesChange = screenModel::setSpaces,
             onSpaceOpen = { index, privateKey -> navigator += SpaceScreen(index, privateKey) },
+            isSaving = isSaving,
         )
     }
 }
@@ -60,7 +62,8 @@ fun SpaceListScreenContent(
     cryptoProvider: CryptoProvider,
     spaces: PersistentList<EncryptedSpaceInfo>,
     onSpacesChange: (list: PersistentList<EncryptedSpaceInfo>) -> Unit,
-    onSpaceOpen: (index: Int, privateKey: PrivateKey) -> Unit
+    onSpaceOpen: (index: Int, privateKey: PrivateKey) -> Unit,
+    isSaving: Boolean,
 ) {
     Scaffold(
         topBar = {
@@ -71,7 +74,12 @@ fun SpaceListScreenContent(
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                     )
-                }
+                },
+                actions = {
+                    if (isSaving) {
+                        SyncIndicator()
+                    }
+                },
             )
         }
     ) { paddingValues ->
