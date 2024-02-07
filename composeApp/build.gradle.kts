@@ -1,6 +1,7 @@
 import org.gradle.internal.os.OperatingSystem
 import org.jetbrains.compose.ExperimentalComposeLibrary
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
+import org.jetbrains.kotlin.gradle.plugin.KotlinDependencyHandler
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
@@ -49,33 +50,59 @@ kotlin {
             implementation(libs.color.picker)
         }
         desktopMain.dependencies {
-            val os = OperatingSystem.current()
-
-            val platform = when {
-                os.isWindows -> "win"
-                os.isMacOsX -> "mac"
-                else -> "linux"
-            }
-
-            val targetArch = when (val osArch = System.getProperty("os.arch")) {
-                "x86_64" -> "x86"
-                "amd64" -> null
-                "aarch64" -> "aarch64"
-                else -> error("Unsupported arch: $osArch")
-            }
-
-            val suffix = listOfNotNull(platform, targetArch).joinToString("-")
-
-            implementation("${libs.javafx.base.get()}:$suffix")
-            implementation("${libs.javafx.graphics.get()}:$suffix")
-            implementation("${libs.javafx.controls.get()}:$suffix")
-            implementation("${libs.javafx.media.get()}:$suffix")
-            implementation("${libs.javafx.web.get()}:$suffix")
-            implementation("${libs.javafx.swing.get()}:$suffix")
+            nativeJavaFx()
+            
+            nativeSkiko()
+            
             implementation(compose.desktop.currentOs)
             implementation(libs.bouncycastle)
         }
     }
+}
+
+fun KotlinDependencyHandler.nativeJavaFx() {
+    val os = OperatingSystem.current()
+
+    val platform = when {
+        os.isWindows -> "win"
+        os.isMacOsX -> "mac"
+        else -> "linux"
+    }
+
+    val targetArch = when (val osArch = System.getProperty("os.arch")) {
+        "x86" -> "x86"
+        "x86_64", "amd64" -> null
+        "aarch64" -> "aarch64"
+        else -> error("Unsupported arch: $osArch")
+    }
+
+    val suffix = listOfNotNull(platform, targetArch).joinToString("-")
+
+    implementation("${libs.javafx.base.get()}:$suffix")
+    implementation("${libs.javafx.graphics.get()}:$suffix")
+    implementation("${libs.javafx.controls.get()}:$suffix")
+    implementation("${libs.javafx.media.get()}:$suffix")
+    implementation("${libs.javafx.web.get()}:$suffix")
+    implementation("${libs.javafx.swing.get()}:$suffix")
+}
+
+fun KotlinDependencyHandler.nativeSkiko() {
+    val osName = System.getProperty("os.name")
+    val targetOs = when {
+        osName == "Mac OS X" -> "macos"
+        osName.startsWith("Win") -> "windows"
+        osName.startsWith("Linux") -> "linux"
+        else -> error("Unsupported OS: $osName")
+    }
+
+    val targetArch = when (val osArch = System.getProperty("os.arch")) {
+        "x86_64", "amd64" -> "x64"
+        "aarch64" -> "arm64"
+        else -> error("Unsupported arch: $osArch")
+    }
+    
+    val target = "${targetOs}-${targetArch}"
+    implementation("org.jetbrains.skiko:skiko-awt-runtime-$target:${libs.versions.skiko.get()}")
 }
 
 android {

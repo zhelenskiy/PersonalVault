@@ -1,5 +1,3 @@
-import androidx.compose.desktop.ui.tooling.preview.Preview
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -8,7 +6,6 @@ import androidx.compose.ui.window.application
 import editor.FxEventLoopReactivizer
 import editor.LocalWindow
 import editor.fakeWebView
-import kotlin.concurrent.thread
 
 fun main() = application {
     val fxEventLoopReactivizer = remember {
@@ -24,13 +21,7 @@ fun main() = application {
     }
     LaunchedEffect(Unit) {
         runCatching {
-            fakeWebView() // make initalization in background
+            fakeWebView() // make initialization in background
         }.onFailure { it.printStackTrace() }
     }
-}
-
-@Preview
-@Composable
-fun AppDesktopPreview() {
-    App()
 }
