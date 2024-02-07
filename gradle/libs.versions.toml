@@ -24,6 +24,8 @@ richeditor = "1.0.0-rc01"
 serialialization = "1.6.2"
 markdown = "0.5.0"
 color-picker = "0.7.0"
+jdk = "17"
+javafx = "17.0.2"
 
 [libraries]
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
@@ -52,6 +54,12 @@ kotlin-collections-immutable = { module = "org.jetbrains.kotlinx:kotlinx-collect
 serialization = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialialization" }
 markdown = { module = "org.jetbrains:markdown", version.ref = "markdown" }
 color-picker = { module = "com.godaddy.android.colorpicker:compose-color-picker", version.ref = "color-picker" }
+javafx-base = { module = "org.openjfx:javafx-base", version.ref = "javafx" }
+javafx-graphics = { module = "org.openjfx:javafx-graphics", version.ref = "javafx" }
+javafx-controls = { module = "org.openjfx:javafx-controls", version.ref = "javafx" }
+javafx-media = { module = "org.openjfx:javafx-media", version.ref = "javafx" }
+javafx-web = { module = "org.openjfx:javafx-web", version.ref = "javafx" }
+javafx-swing = { module = "org.openjfx:javafx-swing", version.ref = "javafx" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }

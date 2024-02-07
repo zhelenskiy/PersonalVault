@@ -18,4 +18,4 @@ dependencyResolutionManagement {
     }
 }
 
-include(":composeApp", ":desktopBrowser")
+include(":composeApp")

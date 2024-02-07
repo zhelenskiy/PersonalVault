@@ -5,9 +5,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
-import webview.FxEventLoopReactivizer
-import webview.LocalWindow
-import webview.fakeWebView
+import editor.FxEventLoopReactivizer
+import editor.LocalWindow
+import editor.fakeWebView
 import kotlin.concurrent.thread
 
 fun main() = application {

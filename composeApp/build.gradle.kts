@@ -1,3 +1,4 @@
+import org.gradle.internal.os.OperatingSystem
 import org.jetbrains.compose.ExperimentalComposeLibrary
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 
@@ -8,7 +9,7 @@ plugins {
     alias(libs.plugins.serialization)
 }
 
-val jdkVersion = "17"
+val jdkVersion = libs.versions.jdk.get()
 kotlin {
     androidTarget {
         compilations.all {
@@ -18,11 +19,7 @@ kotlin {
         }
     }
     
-    jvm("desktop") {
-        jvmToolchain {
-            languageVersion = JavaLanguageVersion.of(jdkVersion)
-        }
-    }
+    jvm("desktop")
     
     sourceSets {
         val desktopMain by getting
@@ -52,40 +49,29 @@ kotlin {
             implementation(libs.color.picker)
         }
         desktopMain.dependencies {
-            implementation(project(":desktopBrowser"))
-            val os = org.gradle.internal.os.OperatingSystem.current()
+            val os = OperatingSystem.current()
 
             val platform = when {
                 os.isWindows -> "win"
                 os.isMacOsX -> "mac"
                 else -> "linux"
             }
-            val fxVersion = "$jdkVersion.0.2"
-            val osName = System.getProperty("os.name")
-            val targetOs = when {
-                osName == "Mac OS X" -> "macos"
-                osName.startsWith("Win") -> "windows"
-                osName.startsWith("Linux") -> "linux"
-                else -> error("Unsupported OS: $osName")
-            }
 
-            val osArch = System.getProperty("os.arch")
-            val targetArch = when (osArch) {
-                "x86_64", "amd64" -> "x64"
-                "aarch64" -> "arm64"
+            val targetArch = when (val osArch = System.getProperty("os.arch")) {
+                "x86_64" -> "x86"
+                "amd64" -> null
+                "aarch64" -> "aarch64"
                 else -> error("Unsupported arch: $osArch")
             }
 
-            val version = "0.7.70" // or any more recent version
-            val target = "${targetOs}-${targetArch}"
-            api("org.jetbrains.skiko:skiko-awt-runtime-$target:$version")
+            val suffix = listOfNotNull(platform, targetArch).joinToString("-")
 
-            implementation("org.openjfx:javafx-base:$fxVersion:${platform}-$osArch")
-            implementation("org.openjfx:javafx-graphics:$fxVersion:${platform}-$osArch")
-            implementation("org.openjfx:javafx-controls:$fxVersion:${platform}-$osArch")
-            implementation("org.openjfx:javafx-media:$fxVersion:${platform}-$osArch")
-            implementation("org.openjfx:javafx-web:$fxVersion:${platform}-$osArch")
-            implementation("org.openjfx:javafx-swing:$fxVersion:${platform}-$osArch")
+            implementation("${libs.javafx.base.get()}:$suffix")
+            implementation("${libs.javafx.graphics.get()}:$suffix")
+            implementation("${libs.javafx.controls.get()}:$suffix")
+            implementation("${libs.javafx.media.get()}:$suffix")
+            implementation("${libs.javafx.web.get()}:$suffix")
+            implementation("${libs.javafx.swing.get()}:$suffix")
             implementation(compose.desktop.currentOs)
             implementation(libs.bouncycastle)
         }
@@ -118,8 +104,8 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
+        sourceCompatibility = JavaVersion.toVersion(jdkVersion)
+        targetCompatibility = JavaVersion.toVersion(jdkVersion)
     }
     dependencies {
         debugImplementation(libs.compose.ui.tooling)

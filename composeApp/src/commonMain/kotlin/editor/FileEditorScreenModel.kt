@@ -49,7 +49,7 @@ class FileEditorScreenModel(di: DI, editorScreenInfo: FileEditorScreenInfo) : Sc
                     try {
                         savingCount.value++
                         updateFileInRepository(newFile)
-                    } catch (e: Exception) {
+                    } catch (e: Throwable) {
                         e.printStackTrace()
                     } finally {
                         savingCount.value--
