@@ -29,6 +29,8 @@ kotlin {
             implementation(libs.compose.ui.tooling.preview)
             implementation(libs.androidx.activity.compose)
             implementation(libs.bouncycastle)
+            implementation(libs.androidx.startup.runtime)
+            implementation(libs.kotlin.coroutines.android)
         }
         commonMain.dependencies {
             implementation(compose.runtime)
@@ -48,6 +50,9 @@ kotlin {
             implementation(libs.serialization)
             implementation(libs.markdown)
             implementation(libs.color.picker)
+            implementation(libs.kstore)
+            implementation(libs.kstore.file)
+            implementation(libs.kotlin.coroutines.core)
         }
         desktopMain.dependencies {
             nativeJavaFx()
@@ -56,6 +61,8 @@ kotlin {
             
             implementation(compose.desktop.currentOs)
             implementation(libs.bouncycastle)
+            implementation(libs.appdirs)
+            implementation(libs.kotlin.coroutines.swing)
         }
     }
 }

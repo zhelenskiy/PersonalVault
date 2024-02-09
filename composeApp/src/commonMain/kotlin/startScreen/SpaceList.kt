@@ -21,6 +21,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.*
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -43,15 +44,19 @@ class SpaceListScreen : Screen {
     @Composable
     override fun Content() {
         val screenModel = rememberScreenModel<SpaceListScreenModel>()
-        val spaces by screenModel.spaces.collectAsState()
+        val versionedSpaces by screenModel.spaces.collectAsState()
+        val spaces = versionedSpaces
         val navigator = LocalNavigator.currentOrThrow
         val isSaving by screenModel.isSaving.collectAsState()
+        val isFetchingInitialData by screenModel.isFetchingInitialData.collectAsState()
         SpaceListScreenContent(
             cryptoProvider = screenModel.cryptoProvider,
             spaces = spaces,
-            onSpacesChange = screenModel::setSpaces,
+            onSpacesChange = { screenModel.setSpaces(screenModel.getNewVersionNumber(), it) },
             onSpaceOpen = { index, privateKey -> navigator += SpaceScreen(index, privateKey) },
             isSaving = isSaving,
+            onDeleteAll = { screenModel.deleteAll() },
+            isFetchingInitialData = isFetchingInitialData,
         )
     }
 }
@@ -63,7 +68,9 @@ fun SpaceListScreenContent(
     spaces: PersistentList<EncryptedSpaceInfo>,
     onSpacesChange: (list: PersistentList<EncryptedSpaceInfo>) -> Unit,
     onSpaceOpen: (index: Int, privateKey: PrivateKey) -> Unit,
+    onDeleteAll: () -> Unit,
     isSaving: Boolean,
+    isFetchingInitialData: Boolean,
 ) {
     Scaffold(
         topBar = {
@@ -79,58 +86,85 @@ fun SpaceListScreenContent(
                     if (isSaving) {
                         SyncIndicator()
                     }
+
+                    var showDeleteAllDialog by rememberSaveable { mutableStateOf(false) }
+                    IconButton(onClick = { showDeleteAllDialog = true }) {
+                        Icon(Icons.Default.Delete, "Delete all")
+                    }
+                    if (showDeleteAllDialog) {
+                        DeletionConfirmation(
+                            windowTitle = "Deleting space",
+                            text = "Do you really want to delete all spaces?",
+                            delete = onDeleteAll,
+                            closeDialog = { showDeleteAllDialog = false },
+                        )
+                    }
                 },
             )
         }
     ) { paddingValues ->
         Box(Modifier.windowInsetsPadding(WindowInsets.ime).padding(paddingValues)) {
-            ModifiableList(
-                items = spaces,
-                onEmptyContent = { Text("No spaces yet") },
-                onCreateItemRequest = { onClose ->
-                    NewSpaceDialog(
-                        cryptoProvider = cryptoProvider,
-                        onDismissRequest = onClose,
-                        addSpace = { onSpacesChange(spaces.add(it)) }
+            AnimatedVisibility(isFetchingInitialData, enter = fadeIn(), exit = fadeOut()) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "Retrieving saved data",
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth(),
+                        style = MaterialTheme.typography.bodyLarge,
                     )
-                },
-                onChangeItemRequest = { index, space, onClose ->
-                    EditSpaceDialog(
-                        cryptoProvider = cryptoProvider,
-                        oldSpaceInfo = space,
-                        onDismissRequest = onClose,
-                        replaceSpace = { newSpace ->
-                            onSpacesChange(spaces.set(index, newSpace))
-                        }
-                    )
-                },
-                onDeleteItemRequest = { index, space, onClose ->
-                    DeletionConfirmation(
-                        windowTitle = "Deleting space",
-                        text = "Are you sure you want to delete space \"${space.name}\"?",
-                        deleteSpace = { onSpacesChange(spaces.removeAt(index)) },
-                        closeDialog = onClose,
-                    )
-                },
-                onItemClick = { index, space, onClose ->
-                    OpenSpaceDialog(
-                        cryptoProvider = cryptoProvider,
-                        spaceInfo = space,
-                        onDismissRequest = onClose,
-                        onPrivateKeyReceived = { onSpaceOpen(index, it) },
-                    )
-                },
-            ) { index, space ->
-                CardTextField(
-                    space.name,
-                    onValueChange = {
-                        onSpacesChange(
-                            spaces.set(
-                                index = index,
-                                element = EncryptedSpaceInfo(it, space.publicKey, space.encryptedData)
-                            )
+                    Spacer(Modifier.height(20.dp))
+                    CircularProgressIndicator()
+                }
+            }
+            AnimatedVisibility(!isFetchingInitialData, enter = fadeIn(), exit = fadeOut()) {
+                ModifiableList(
+                    items = spaces,
+                    onEmptyContent = { Text("No spaces yet") },
+                    onCreateItemRequest = { onClose ->
+                        NewSpaceDialog(
+                            cryptoProvider = cryptoProvider,
+                            onDismissRequest = onClose,
+                            addSpace = { onSpacesChange(spaces.add(it)) }
                         )
-                    })
+                    },
+                    onChangeItemRequest = { index, space, onClose ->
+                        EditSpaceDialog(
+                            cryptoProvider = cryptoProvider,
+                            oldSpaceInfo = space,
+                            onDismissRequest = onClose,
+                            replaceSpace = { newSpace ->
+                                onSpacesChange(spaces.set(index, newSpace))
+                            }
+                        )
+                    },
+                    onDeleteItemRequest = { index, space, onClose ->
+                        DeletionConfirmation(
+                            windowTitle = "Deleting space",
+                            text = "Do you really want to delete space \"${space.name}\"?",
+                            delete = { onSpacesChange(spaces.removeAt(index)) },
+                            closeDialog = onClose,
+                        )
+                    },
+                    onItemClick = { index, space, onClose ->
+                        OpenSpaceDialog(
+                            cryptoProvider = cryptoProvider,
+                            spaceInfo = space,
+                            onDismissRequest = onClose,
+                            onPrivateKeyReceived = { onSpaceOpen(index, it) },
+                        )
+                    },
+                ) { index, space ->
+                    CardTextField(
+                        space.name,
+                        onValueChange = {
+                            onSpacesChange(
+                                spaces.set(
+                                    index = index,
+                                    element = EncryptedSpaceInfo(it, space.publicKey, space.encryptedData)
+                                )
+                            )
+                        })
+                }
             }
         }
     }
@@ -152,7 +186,8 @@ fun NewSpaceDialog(
         var name by rememberSaveable { mutableStateOf("") }
         var password by rememberSaveable { mutableStateOf("") }
         var passwordCopy by rememberSaveable { mutableStateOf("") }
-        val nameIsCorrect = true // name.isNotBlank() // uncomment it to validate it here. Also, implement it for renaming then.
+        val nameIsCorrect =
+            true // name.isNotBlank() // uncomment it to validate it here. Also, implement it for renaming then.
         val passwordIsCorrect = password.length >= minPasswordLength
         val passwordCopyIsCorrect = password == passwordCopy
         val isCorrect = passwordCopyIsCorrect && passwordIsCorrect && nameIsCorrect

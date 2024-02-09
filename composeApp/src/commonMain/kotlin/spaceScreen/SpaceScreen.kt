@@ -42,9 +42,9 @@ class SpaceScreen(private val index: Int, private val cryptoKey: PrivateKey) : S
         val isSaving by screenModel.isSaving.collectAsState()
         SpaceScreenContent(
             name = name,
-            onNameChange = screenModel::setName,
+            onNameChange = { screenModel.setName(screenModel.getNewVersionNumber(), it) },
             spaceStructure = spaceStructure,
-            onSpaceStructureChange = screenModel::setSpaceStructure,
+            onSpaceStructureChange = { screenModel.setSpaceStructure(screenModel.getNewVersionNumber(), it) },
             onBackPress = { navigator.pop() },
             onFileOpen = { navigator += FileEditorScreen(index, cryptoKey, it) },
             isSaving = isSaving,
@@ -215,8 +215,8 @@ fun FileSystem(
             onDeleteItemRequest = { onClose ->
                 DeletionConfirmation(
                     windowTitle = "Deleting file",
-                    text = "Are you sure you want to delete file \"${file.name}\"?",
-                    deleteSpace = { onChange(null, files.remove(element)) },
+                    text = "Do you really want to delete file \"${file.name}\"?",
+                    delete = { onChange(null, files.remove(element)) },
                     closeDialog = onClose,
                 )
             }
@@ -280,8 +280,8 @@ fun FileSystem(
             onDeleteItemRequest = { onClose ->
                 DeletionConfirmation(
                     windowTitle = "Deleting folder",
-                    text = "Are you sure you want to delete folder \"${element.name}\"?",
-                    deleteSpace = {
+                    text = "Do you really want to delete folder \"${element.name}\"?",
+                    delete = {
                         val removedFileIds = buildList {
                             fun traverse(folder: FileSystemItem.Directory) {
                                 for (child in folder.children) {

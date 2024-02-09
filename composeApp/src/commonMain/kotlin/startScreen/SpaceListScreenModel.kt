@@ -1,58 +1,40 @@
 package startScreen
 
 import cafe.adriel.voyager.core.model.ScreenModel
-import common.EncryptedSpaceInfo
+import cafe.adriel.voyager.core.model.screenModelScope
+import common.*
 import crypto.CryptoProvider
 import kotlinx.collections.immutable.PersistentList
-import kotlinx.collections.immutable.persistentListOf
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
-import kotlinx.coroutines.flow.SharingStarted.Companion.WhileSubscribed
-import kotlinx.coroutines.launch
 import org.kodein.di.DI
 import org.kodein.di.bindProvider
 import org.kodein.di.instance
+import repositories.OutdatedData
 import repositories.SpacesRepository
 
 val spaceListModule = DI.Module(name = "SpaceList") {
     bindProvider { SpaceListScreenModel(di) }
 }
 
-@OptIn(ExperimentalCoroutinesApi::class)
 class SpaceListScreenModel(di: DI) : ScreenModel {
     val cryptoProvider by di.instance<CryptoProvider>()
     private val spacesRepository by di.instance<SpacesRepository>()
-    private val savingScope get() = spacesRepository.spacesSavingScope
+    private val savingScope get() = screenModelScope
 
-    private val savingCount = MutableStateFlow(0)
+    @OptIn(OutdatedData::class)
+    private val spacesData = makeSpacesDataSynchronizer(savingScope, spacesRepository)
 
-    fun setSpaces(spaces: PersistentList<EncryptedSpaceInfo>) {
-        spacesImpl.value = spaces
+    fun setSpaces(version: Long, spaces: PersistentList<EncryptedSpaceInfo>) {
+        spacesData.setValue(Versioned(version, spaces))
     }
 
-    private fun updateSpacesInRepository(spaces: PersistentList<EncryptedSpaceInfo>) {
-        spacesRepository.updateSpaces { spaces }
-    }
+    val isSaving = spacesData.isLoading
 
-    private val spacesImpl = MutableStateFlow(persistentListOf<EncryptedSpaceInfo>()).apply {
-        savingScope.launch {
-            value = spacesRepository.getCurrentSpaces()
-            collectLatest {
-                try {
-                    savingCount.value++
-                    updateSpacesInRepository(it)
-                } catch (e: Throwable) {
-                    e.printStackTrace()
-                } finally {
-                    savingCount.value--
-                }
-            }
-        }
-    }
+    val spaces: StateFlow<PersistentList<EncryptedSpaceInfo>> = spacesData.values
 
-    val isSaving = savingCount
-        .mapLatest { it > 0 }
-        .stateIn(savingScope, WhileSubscribed(), false)
+    fun deleteAll() = spacesRepository.reset()
 
-    val spaces: StateFlow<PersistentList<EncryptedSpaceInfo>> get() = spacesImpl
+    val isFetchingInitialData = spacesRepository.isFetchingInitialData
+
+    fun getNewVersionNumber() = spacesRepository.getNewVersionNumber()
 }

@@ -1,10 +1,13 @@
 package crypto
 
 import cafe.adriel.voyager.core.lifecycle.JavaSerializable
+import kotlinx.coroutines.yield
+import kotlinx.serialization.Serializable
 
 /**
  * SCrypt configuration (see https://en.wikipedia.org/wiki/Scrypt).
  */
+@Serializable
 data class SCryptConfig(
     val n: Int,
     val r: Int,
@@ -27,23 +30,23 @@ data class SCryptConfig(
 val defaultSCryptConfig = SCryptConfig(32768, 32, 1)
 
 interface CryptoProvider {
-    fun generateSalt(): ByteArray
-    fun generateKeyByteArray(config: SCryptConfig, password: ByteArray, salt: ByteArray, length: Int): ByteArray
+    suspend fun generateSalt(): ByteArray
+    suspend fun generateKeyByteArray(config: SCryptConfig, password: ByteArray, salt: ByteArray, length: Int): ByteArray
 
-    fun sha512(data: ByteArray): ByteArray
-    fun aes256Encrypt(data: ByteArray, key: ByteArray, iv: ByteArray): ByteArray
-    fun aes256Decrypt(encrypted: ByteArray, key: ByteArray, iv: ByteArray): ByteArray
-    fun generateInitializationVector(): ByteArray
+    suspend fun sha512(data: ByteArray): ByteArray
+    suspend fun aes256Encrypt(data: ByteArray, key: ByteArray, iv: ByteArray): ByteArray
+    suspend fun aes256Decrypt(encrypted: ByteArray, key: ByteArray, iv: ByteArray): ByteArray
+    suspend fun generateInitializationVector(): ByteArray
 }
 
 expect class CryptoProviderImpl(): CryptoProvider {
-    override fun generateSalt(): ByteArray
-    override fun generateKeyByteArray(config: SCryptConfig, password: ByteArray, salt: ByteArray, length: Int): ByteArray
+    override suspend fun generateSalt(): ByteArray
+    override suspend fun generateKeyByteArray(config: SCryptConfig, password: ByteArray, salt: ByteArray, length: Int): ByteArray
 
-    override fun sha512(data: ByteArray): ByteArray
-    override fun aes256Encrypt(data: ByteArray, key: ByteArray, iv: ByteArray): ByteArray
-    override fun aes256Decrypt(encrypted: ByteArray, key: ByteArray, iv: ByteArray): ByteArray
-    override fun generateInitializationVector(): ByteArray
+    override suspend fun sha512(data: ByteArray): ByteArray
+    override suspend fun aes256Encrypt(data: ByteArray, key: ByteArray, iv: ByteArray): ByteArray
+    override suspend fun aes256Decrypt(encrypted: ByteArray, key: ByteArray, iv: ByteArray): ByteArray
+    override suspend fun generateInitializationVector(): ByteArray
 }
 
 class PrivateKey(
@@ -56,38 +59,47 @@ class PrivateKey(
     fun toPublicKey() = publicKey
 }
 
+@Serializable
 class PublicKey(
     val config: SCryptConfig,
     val keyLength: Int,
     val salt: ByteArray,
     val hash: ByteArray,
 ): JavaSerializable {
-    fun toPrivate(cryptoProvider: CryptoProvider, password: ByteArray): PrivateKey? {
+    suspend fun toPrivate(cryptoProvider: CryptoProvider, password: ByteArray): PrivateKey? {
         val keyByteArray =cryptoProvider.generateKeyByteArray(config = config, password = password, salt = salt, length = keyLength)
+        yield()
         val keyHash = cryptoProvider.sha512(salt + keyByteArray)
+        yield()
         if (!keyHash.contentEquals(hash)) return null
+        yield()
         return PrivateKey(config, keyByteArray, salt, keyHash)
     }
 }
 
-fun CryptoProvider.generateKey(config: SCryptConfig, password: ByteArray): PrivateKey {
+suspend fun CryptoProvider.generateKey(config: SCryptConfig, password: ByteArray): PrivateKey {
     val salt = generateSalt()
+    yield()
     val aesKeySize = 128 / 8
     val key = generateKeyByteArray(config, password, salt, aesKeySize)
+    yield()
     val hash = sha512(salt + key)
+    yield()
     return PrivateKey(config, key, salt, hash)
 }
 
+@Serializable
 class EncryptedData(
     val initializationVector: ByteArray,
     val encryptedBytes: ByteArray,
 ) : JavaSerializable
 
-fun CryptoProvider.encryptData(data: ByteArray, privateKey: PrivateKey): EncryptedData {
+suspend fun CryptoProvider.encryptData(data: ByteArray, privateKey: PrivateKey): EncryptedData {
     val iv = generateInitializationVector()
+    yield()
     return EncryptedData(iv, aes256Encrypt(data, privateKey.key, iv))
 }
 
-fun CryptoProvider.decryptData(encryptedData: EncryptedData, privateKey: PrivateKey): ByteArray {
+suspend fun CryptoProvider.decryptData(encryptedData: EncryptedData, privateKey: PrivateKey): ByteArray {
     return aes256Decrypt(encryptedData.encryptedBytes, privateKey.key, encryptedData.initializationVector)
 }

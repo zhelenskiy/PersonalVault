@@ -10,8 +10,6 @@ import crypto.CryptoProvider
 import crypto.PrivateKey
 import kotlinx.collections.immutable.*
 import kotlinx.serialization.*
-import kotlinx.serialization.builtins.ListSerializer
-import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
@@ -20,39 +18,6 @@ import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.Json
 import org.jetbrains.compose.resources.ExperimentalResourceApi
 import org.jetbrains.compose.resources.painterResource
-
-class PersistentListSerializer<T>(private val serializer: KSerializer<T>) : KSerializer<PersistentList<T>> {
-    private val delegate = ListSerializer(serializer)
-
-    @OptIn(ExperimentalSerializationApi::class)
-    override val descriptor: SerialDescriptor = SerialDescriptor("PersistentList", delegate.descriptor)
-
-    override fun deserialize(decoder: Decoder): PersistentList<T> {
-        return decoder.decodeSerializableValue(delegate).toPersistentList()
-    }
-
-    override fun serialize(encoder: Encoder, value: PersistentList<T>) {
-        encoder.encodeSerializableValue(delegate, value)
-    }
-}
-
-class PersistentMapSerializer<K, V>(
-    private val keySerializer: KSerializer<K>,
-    private val valueSerializer: KSerializer<V>
-) : KSerializer<PersistentMap<K, V>> {
-    private val delegate = MapSerializer(keySerializer, valueSerializer)
-
-    @OptIn(ExperimentalSerializationApi::class)
-    override val descriptor: SerialDescriptor = SerialDescriptor("PersistentMap", delegate.descriptor)
-
-    override fun deserialize(decoder: Decoder): PersistentMap<K, V> {
-        return decoder.decodeSerializableValue(delegate).toPersistentMap()
-    }
-
-    override fun serialize(encoder: Encoder, value: PersistentMap<K, V>) {
-        encoder.encodeSerializableValue(delegate, value)
-    }
-}
 
 @Serializable
 sealed class FileType {
@@ -220,7 +185,7 @@ class SpaceStructure(
 
     operator fun get(fileId: FileSystemItem.FileId) = files[fileId]
     private fun toBytes() = Json.encodeToString(this).encodeToByteArray()
-    fun toDecryptedBytes(name: String, privateKey: PrivateKey, provider: CryptoProvider) =
+    suspend fun toDecryptedBytes(name: String, privateKey: PrivateKey, provider: CryptoProvider) =
         DecryptedSpaceInfo.fromDecryptedData(
             name = name,
             privateKey = privateKey,
@@ -228,13 +193,13 @@ class SpaceStructure(
             provider = provider
         )
 
-    fun toEncryptedBytes(name: String, privateKey: PrivateKey, provider: CryptoProvider) =
+    suspend fun toEncryptedBytes(name: String, privateKey: PrivateKey, provider: CryptoProvider) =
         toDecryptedBytes(name, privateKey, provider).toEncryptedSpaceInfo()
 
     companion object {
         private fun fromBytes(bytes: ByteArray) = Json.decodeFromString<SpaceStructure>(bytes.decodeToString())
         fun fromDecryptedBytes(decryptedSpaceInfo: DecryptedSpaceInfo) = fromBytes(decryptedSpaceInfo.decryptedData)
-        fun fromEncryptedBytes(
+        suspend fun fromEncryptedBytes(
             cryptoProvider: CryptoProvider,
             encryptedSpaceInfo: EncryptedSpaceInfo,
             privateKey: PrivateKey

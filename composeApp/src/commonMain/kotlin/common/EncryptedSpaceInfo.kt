@@ -2,20 +2,22 @@ package common
 
 import cafe.adriel.voyager.core.lifecycle.JavaSerializable
 import crypto.*
+import kotlinx.serialization.Serializable
 
+@Serializable
 class EncryptedSpaceInfo(
     val name: String,
     val publicKey: PublicKey,
     val encryptedData: EncryptedData,
 ) : JavaSerializable {
-    fun toDecryptedSpaceInfo(provider: CryptoProvider, password: ByteArray): DecryptedSpaceInfo? {
+    suspend fun toDecryptedSpaceInfo(provider: CryptoProvider, password: ByteArray): DecryptedSpaceInfo? {
         val privateKey = publicKey.toPrivate(provider, password) ?: return null
         val decryptedData = provider.decryptData(encryptedData, privateKey)
         return DecryptedSpaceInfo(name, privateKey, encryptedData, decryptedData)
     }
 
     companion object {
-        fun fromDecryptedData(
+        suspend fun fromDecryptedData(
             name: String,
             privateKey: PrivateKey,
             data: ByteArray,

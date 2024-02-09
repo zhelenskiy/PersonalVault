@@ -10,13 +10,6 @@ class DecryptedSpaceInfo(
     val decryptedData: ByteArray,
 ) : JavaSerializable {
 
-    constructor(
-        name: String,
-        privateKey: PrivateKey,
-        encryptedData: EncryptedData,
-        cryptoProvider: CryptoProvider
-    ) : this(name, privateKey, encryptedData, cryptoProvider.decryptData(encryptedData, privateKey))
-
     val publicKey get() = privateKey.toPublicKey()
 
     private val encryptedSpaceInfo = EncryptedSpaceInfo(name, publicKey, encryptedData)
@@ -24,7 +17,14 @@ class DecryptedSpaceInfo(
     fun toEncryptedSpaceInfo() = encryptedSpaceInfo
 
     companion object {
-        fun fromDecryptedData(
+        suspend operator fun invoke(
+            name: String,
+            privateKey: PrivateKey,
+            encryptedData: EncryptedData,
+            cryptoProvider: CryptoProvider
+        ) = DecryptedSpaceInfo(name, privateKey, encryptedData, cryptoProvider.decryptData(encryptedData, privateKey))
+
+        suspend fun fromDecryptedData(
             name: String,
             privateKey: PrivateKey,
             data: ByteArray,

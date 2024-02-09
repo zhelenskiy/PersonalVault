@@ -11,16 +11,16 @@ import java.security.SecureRandom
 
 actual class CryptoProviderImpl: CryptoProvider {
     private val secureRandom = SecureRandom()
-    actual override fun generateSalt(): ByteArray = secureRandom.generateSeed(64)
+    actual override suspend fun generateSalt(): ByteArray = secureRandom.generateSeed(64)
 
-    actual override fun generateKeyByteArray(
+    actual override suspend fun generateKeyByteArray(
         config: SCryptConfig,
         password: ByteArray,
         salt: ByteArray,
         length: Int
     ): ByteArray = SCrypt.generate(password, salt, config.n, config.r, config.p, length)
     
-    actual override fun sha512(data: ByteArray): ByteArray {
+    actual override suspend fun sha512(data: ByteArray): ByteArray {
         val digest = SHA512Digest()
         val retValue = ByteArray(digest.digestSize)
         digest.update(data, 0, data.size)
@@ -37,16 +37,16 @@ actual class CryptoProviderImpl: CryptoProvider {
         return outBuf.copyOfRange(0, actualLength)
     }
     
-    actual override fun generateInitializationVector(): ByteArray = secureRandom.generateSeed(16)
+    actual override suspend fun generateInitializationVector(): ByteArray = secureRandom.generateSeed(16)
 
-    actual override fun aes256Encrypt(data: ByteArray, key: ByteArray, iv: ByteArray): ByteArray {
+    actual override suspend fun aes256Encrypt(data: ByteArray, key: ByteArray, iv: ByteArray): ByteArray {
         val aes = PaddedBufferedBlockCipher(CBCBlockCipher.newInstance(AESEngine.newInstance()))
         val ivAndKey = ParametersWithIV(KeyParameter(key), iv)
         aes.init(true, ivAndKey)
         return cipherData(aes, data)
     }
 
-    actual override fun aes256Decrypt(encrypted: ByteArray, key: ByteArray, iv: ByteArray): ByteArray {
+    actual override suspend fun aes256Decrypt(encrypted: ByteArray, key: ByteArray, iv: ByteArray): ByteArray {
         val aes = PaddedBufferedBlockCipher(CBCBlockCipher.newInstance(AESEngine.newInstance()))
         val ivAndKey = ParametersWithIV(KeyParameter(key), iv)
         aes.init(false, ivAndKey)

@@ -33,7 +33,7 @@ actual fun HtmlView(html: String, backgroundColor: androidx.compose.ui.graphics.
                     }
                 }
                 loadData(html, "text/html", "UTF-8")
-                settings.useWideViewPort = false
+                settings.useWideViewPort = true
 
                 setOnScrollChangeListener { _, _, _, _, _ ->
                     evaluateJavascript("document.body.scrollTop") { vertical ->

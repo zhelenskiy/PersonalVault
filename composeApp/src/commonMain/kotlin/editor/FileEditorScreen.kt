@@ -57,7 +57,7 @@ class FileEditorScreen(private val index: Int, private val cryptoKey: PrivateKey
             file = file,
             backPress = { navigator.pop() },
             onHomePress = { navigator.popUntilRoot() },
-            onFileChanged = screenModel::setFile,
+            onFileChanged = { screenModel.setFile(screenModel.getNewVersionNumber(), it) },
             isSaving = isSaving,
         )
     }
@@ -112,10 +112,12 @@ fun FileEditorScreenContent(
 @Composable
 fun TextFileEditor(file: TextFile, onFileChanged: (TextFile) -> Unit) {
     val (textFieldValue, onTextFieldValueChange) = remember { mutableStateOf(TextFieldValue(file.text)) }
-    LaunchedEffect(textFieldValue) {
-        when (file) {
-            is MarkupTextFile -> onFileChanged(MarkupTextFile(name = file.name, type = file.type, text = textFieldValue.text, editorMode = file.editorMode))
-            is PlainTextFile -> onFileChanged(PlainTextFile(name = file.name, text = textFieldValue.text))
+    LaunchedEffect(textFieldValue.text) {
+        if (file.text != textFieldValue.text) {
+            when (file) {
+                is MarkupTextFile -> onFileChanged(MarkupTextFile(name = file.name, type = file.type, text = textFieldValue.text, editorMode = file.editorMode))
+                is PlainTextFile -> onFileChanged(PlainTextFile(name = file.name, text = textFieldValue.text))
+            }
         }
     }
     when (file) {

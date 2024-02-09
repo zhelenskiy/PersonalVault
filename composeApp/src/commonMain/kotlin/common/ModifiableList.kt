@@ -149,7 +149,7 @@ fun <T> ModifiableList(
 fun DeletionConfirmation(
     windowTitle: String,
     text: String,
-    deleteSpace: () -> Unit,
+    delete: () -> Unit,
     closeDialog: () -> Unit,
 ) {
     NativeDialog(windowTitle, size = DpSize(400.dp, 120.dp), onDismissRequest = closeDialog) {
@@ -162,7 +162,7 @@ fun DeletionConfirmation(
             DialogButtons(
                 enableClickingSuccessButton = true,
                 onDismissRequest = closeDialog,
-                onSuccess = { deleteSpace(); closeDialog() },
+                onSuccess = { delete(); closeDialog() },
             )
         }
     }
