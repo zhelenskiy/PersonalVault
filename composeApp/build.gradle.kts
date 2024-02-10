@@ -152,8 +152,11 @@ compose.desktop {
 
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
+
             packageName = "Secure vault"
             packageVersion = "1.0.0"
+            includeAllModules = true
+
             macOS {
                 iconFile.set(project.file("icon.icns"))
             }
