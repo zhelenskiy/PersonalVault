@@ -1,8 +1,10 @@
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
+import androidx.compose.ui.window.rememberWindowState
 import editor.FxEventLoopReactivizer
 import editor.LocalWindow
 import editor.fakeWebView
@@ -18,6 +20,7 @@ fun main() = application {
         onCloseRequest = { exitApplication(); fxEventLoopReactivizer.finish() },
         title = "PersonalVault",
         icon = painterResource("encrypted.xml"),
+        state = rememberWindowState(width = 900.dp, height = 675.dp)
     ) {
         CompositionLocalProvider(LocalWindow provides window) {
             App()

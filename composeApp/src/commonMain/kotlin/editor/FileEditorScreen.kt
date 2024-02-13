@@ -1,10 +1,7 @@
 package editor
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.*
 import androidx.compose.animation.core.*
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -19,9 +16,12 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -40,10 +40,14 @@ import com.godaddy.android.colorpicker.HsvColor
 import common.*
 import common.FileSystemItem.FileId
 import crypto.PrivateKey
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import org.intellij.markdown.flavours.gfm.GFMFlavourDescriptor
 import org.intellij.markdown.html.HtmlGenerator
 import org.intellij.markdown.parser.MarkdownParser
 import org.jetbrains.compose.resources.ExperimentalResourceApi
 import org.jetbrains.compose.resources.painterResource
+import kotlin.time.Duration.Companion.seconds
 
 class FileEditorScreen(private val index: Int, private val cryptoKey: PrivateKey, private val fileId: FileId) : Screen {
     @Composable
@@ -115,7 +119,15 @@ fun TextFileEditor(file: TextFile, onFileChanged: (TextFile) -> Unit) {
     LaunchedEffect(textFieldValue.text) {
         if (file.text != textFieldValue.text) {
             when (file) {
-                is MarkupTextFile -> onFileChanged(MarkupTextFile(name = file.name, type = file.type, text = textFieldValue.text, editorMode = file.editorMode))
+                is MarkupTextFile -> onFileChanged(
+                    MarkupTextFile(
+                        name = file.name,
+                        type = file.type,
+                        text = textFieldValue.text,
+                        editorMode = file.editorMode
+                    )
+                )
+
                 is PlainTextFile -> onFileChanged(PlainTextFile(name = file.name, text = textFieldValue.text))
             }
         }
@@ -135,7 +147,7 @@ fun TextFileEditor(file: TextFile, onFileChanged: (TextFile) -> Unit) {
                     )
                 )
             },
-            onTextFieldValueChange = onTextFieldValueChange
+            onTextFieldValueChange = onTextFieldValueChange,
         )
 
         is PlainTextFile -> PlainTextFileEditor(
@@ -356,6 +368,8 @@ private fun MarkedUpTextFileEditor(
                     ) {
                         Icon(painterResource("code_blocks.xml"), contentDescription = "Code block")
                     }
+
+                    CopyHtmlIconButton(fileType, textFieldValue)
                 }
             }
         }
@@ -385,9 +399,7 @@ private fun MarkedUpTextFileEditor(
             val html = when (fileType) {
                 MarkupTextFileType.Html -> textFieldValue.text
                 MarkupTextFileType.Markdown -> rememberSaveable(textFieldValue.text) {
-                    val flavour = org.intellij.markdown.flavours.gfm.GFMFlavourDescriptor()
-                    val parsedTree = MarkdownParser(flavour).buildMarkdownTreeFromString(textFieldValue.text)
-                    HtmlGenerator(textFieldValue.text, parsedTree, flavour).generateHtml()
+                    convertMarkdownToHtml(textFieldValue.text)
                 }
             }
 
@@ -413,6 +425,63 @@ private fun MarkedUpTextFileEditor(
             }
         }
     }
+}
+
+@Composable
+private fun RowScope.CopyHtmlIconButton(
+    fileType: MarkupTextFileType,
+    textFieldValue: TextFieldValue
+) {
+    AnimatedVisibility(fileType == MarkupTextFileType.Markdown) {
+        val clipboardManager = LocalClipboardManager.current
+        val coroutineScope = rememberCoroutineScope()
+        var done by remember { mutableStateOf(false) }
+        IconButton(onClick = {
+            val html = convertMarkdownToHtml(textFieldValue.text)
+            clipboardManager.setText(AnnotatedString(html))
+            coroutineScope.launch {
+                try {
+                    done = true
+                    delay(1.seconds)
+                } finally {
+                    done = false
+                }
+            }
+        }) {
+            AnimatedContent(done, transitionSpec = {
+                if (done) scaleIn() togetherWith scaleOut() else fadeIn() togetherWith fadeOut()
+            }) {
+                if (done) {
+                    Icon(Icons.Default.Done, contentDescription = "Copied to clipboard")
+                } else {
+                    Box {
+                        Icon(
+                            imageVector = Icons.Default.ContentCopy,
+                            modifier = Modifier
+                                .offset(y = (-3).dp)
+                                .align(Alignment.Center)
+                                .scale(0.7f),
+                            contentDescription = "Copy to clipboard"
+                        )
+                        Icon(
+                            imageVector = Icons.Default.Html,
+                            modifier = Modifier
+                                .offset(y = 10.dp)
+                                .align(Alignment.Center)
+                                .scale(0.7f),
+                            contentDescription = null
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun convertMarkdownToHtml(markdown: String): String {
+    val flavour = GFMFlavourDescriptor()
+    val parsedTree = MarkdownParser(flavour).buildMarkdownTreeFromString(markdown)
+    return HtmlGenerator(markdown, parsedTree, flavour).generateHtml()
 }
 
 @Composable
@@ -550,15 +619,15 @@ private enum class ValidNumberedListPrefixState { AfterSpace, AfterNumber, After
 private fun String.isValidNumberedListPrefix(): Boolean {
     var state = ValidNumberedListPrefixState.AfterSpace
     for (c in this) {
-        if (c.isWhitespace()) {
+        state = if (c.isWhitespace()) {
             if (state == ValidNumberedListPrefixState.AfterNumber) return false
-            state = ValidNumberedListPrefixState.AfterSpace
+            ValidNumberedListPrefixState.AfterSpace
         } else if (c.isDigit()) {
             if (state == ValidNumberedListPrefixState.AfterDot) return false
-            state = ValidNumberedListPrefixState.AfterNumber
+            ValidNumberedListPrefixState.AfterNumber
         } else if (c == '.') {
             if (state != ValidNumberedListPrefixState.AfterNumber) return false
-            state = ValidNumberedListPrefixState.AfterDot
+            ValidNumberedListPrefixState.AfterDot
         } else {
             return false
         }
