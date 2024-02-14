@@ -186,17 +186,18 @@ fun FileSystem(
         Spacer(Modifier.width(offset))
         Spacer(Modifier.width(48.dp))
         var changeTypeExpanded by rememberSaveable { mutableStateOf(false) }
-        IconButton(onClick = { changeTypeExpanded = true }) {
+        val availableConverters = file.converters
+        IconButton(onClick = { changeTypeExpanded = true }, enabled = availableConverters.isNotEmpty()) {
             file.type.icon()
             DropdownMenu(
                 expanded = changeTypeExpanded,
                 onDismissRequest = { changeTypeExpanded = false },
             ) {
-                for (fileType in FileType.entries) {
+                for ((fileType, converter) in availableConverters.entries) {
                     DropdownMenuItem(
                         text = { Text(fileType.name) },
                         onClick = {
-                            onChange(element, files.put(element, File(file.name, fileType, file.content)))
+                            onChange(element, files.put(element, converter.convert()))
                             changeTypeExpanded = false
                         },
                         leadingIcon = { fileType.icon() }

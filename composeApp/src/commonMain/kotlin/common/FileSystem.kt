@@ -19,6 +19,10 @@ import kotlinx.serialization.json.Json
 import org.jetbrains.compose.resources.ExperimentalResourceApi
 import org.jetbrains.compose.resources.painterResource
 
+fun interface FileConverter {
+    fun convert(): File
+}
+
 @Serializable
 sealed class FileType {
     val name = this::class.simpleName!!
@@ -59,6 +63,7 @@ sealed class File {
     @SerialName("fileType")
     abstract val type: FileType
     abstract val content: ByteArray
+    open val converters: Map<FileType, FileConverter> get() = emptyMap()
 
     companion object {
         operator fun invoke(name: String, type: FileType, content: ByteArray): File = when (type) {
@@ -103,6 +108,12 @@ class MarkupTextFile private constructor(
     override val text: String get() = state.text
     val editorMode: MarkedUpTextFileEditorMode get() = state.editorMode
 
+    @Transient
+    override val converters: Map<FileType, FileConverter> = buildMap {
+        put(TextFileType.PlainText, FileConverter { PlainTextFile(name, text) })
+        (MarkupTextFileType.entries - type).associateWithTo(this) { newFileType -> FileConverter { MarkupTextFile(name, newFileType, content, state) } }
+    }
+
     constructor(
         name: String,
         type: MarkupTextFileType,
@@ -134,6 +145,10 @@ class PlainTextFile private constructor(
 ) : TextFile() {
     constructor(name: String, text: String = "") : this(name, text.encodeToByteArray(), text)
     constructor(name: String, content: ByteArray) : this(name, content, content.decodeToString())
+
+    @Transient
+    override val converters: Map<FileType, FileConverter> = MarkupTextFileType.entries
+        .associateWith { fileType -> FileConverter { MarkupTextFile(name, fileType, text = text) } }.toMap()
 
     override val type: TextFileType get() = TextFileType.PlainText
 }
