@@ -31,6 +31,7 @@ kstore = "0.7.1"
 appdirs = "1.2.2"
 androidx-startup-runtime = "1.1.1"
 kotlin-coroutines = "1.6.4"
+compose-animate-single-dimension = "1.0.1"
 
 [libraries]
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
@@ -72,6 +73,7 @@ androidx-startup-runtime = { group = "androidx.startup", name = "startup-runtime
 kotlin-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlin-coroutines" }
 kotlin-coroutines-swing = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-swing", version.ref = "kotlin-coroutines" }
 kotlin-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "kotlin-coroutines" }
+compose-animate-single-dimension = { module = "com.zhelenskiy:animate-content-single-dimension", version.ref = "compose-animate-single-dimension" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }

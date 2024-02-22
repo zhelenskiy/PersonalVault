@@ -53,6 +53,7 @@ kotlin {
             implementation(libs.kstore)
             implementation(libs.kstore.file)
             implementation(libs.kotlin.coroutines.core)
+            implementation(libs.compose.animate.single.dimension)
         }
         desktopMain.dependencies {
             nativeJavaFx()
