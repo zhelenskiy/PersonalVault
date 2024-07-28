@@ -38,7 +38,6 @@ kotlin {
             implementation(compose.foundation)
             implementation(compose.material3)
             implementation(compose.ui)
-            @OptIn(ExperimentalComposeLibrary::class)
             implementation(compose.components.resources)
             implementation(libs.voyager.navigator)
             implementation(libs.voyager.screenModel)
@@ -55,6 +54,7 @@ kotlin {
             implementation(libs.kstore.file)
             implementation(libs.kotlin.coroutines.core)
             implementation(libs.compose.animate.single.dimension)
+            implementation("io.github.vinceglb:filekit-compose:0.7.0")
         }
         desktopMain.dependencies {
             nativeJavaFx()

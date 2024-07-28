@@ -27,7 +27,9 @@ import common.FileSystemItem.FileId
 import editor.FileEditorScreen
 import kotlinx.collections.immutable.persistentListOf
 import crypto.PrivateKey
+import io.github.vinceglb.filekit.compose.rememberFileSaverLauncher
 import kotlinx.collections.immutable.PersistentMap
+import kotlinx.coroutines.launch
 import kotlin.random.Random
 
 class SpaceScreen(private val index: Int, private val cryptoKey: PrivateKey) : Screen {
@@ -59,6 +61,7 @@ fun SpaceScreenContent(
     onFileOpen: (FileId) -> Unit,
     isSaving: Boolean,
 ) {
+    val snackbarHostState = remember { SnackbarHostState() }
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
@@ -81,6 +84,9 @@ fun SpaceScreenContent(
                     }
                 },
             )
+        },
+        snackbarHost = {
+            SnackbarHost(snackbarHostState)
         }
     ) { paddingValues ->
         if (spaceStructure == null) return@Scaffold
@@ -104,13 +110,17 @@ fun SpaceScreenContent(
                         spaceStructure.fileStructure,
                         onFileOpen = onFileOpen,
                         files = spaceStructure.files,
+                        snackbarHostState = snackbarHostState,
                         onChange = { root: FileSystemItem.Root, files ->
                             onSpaceStructureChange(SpaceStructure(root, files))
-                        }
+                        },
                     )
                 }
-                Box(Modifier.fillMaxWidth(), Alignment.Center) {
-                    CreateFileSystemItemButton(spaceStructure.files) { newItem, newFiles ->
+                Box(Modifier.fillMaxWidth()) {
+                    CreateFileSystemItemButton(
+                        spaceStructure.files,
+                        Modifier.align(Alignment.Center)
+                    ) { newItem, newFiles ->
                         onSpaceStructureChange(
                             SpaceStructure(
                                 FileSystemItem.Root(
@@ -118,6 +128,16 @@ fun SpaceScreenContent(
                                 ), newFiles
                             )
                         )
+                    }
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = spaceStructure.fileStructure.children.isNotEmpty(),
+                        enter = fadeIn(),
+                        exit = fadeOut(),
+                        modifier = Modifier.align(Alignment.CenterEnd),
+                    ) {
+                        DirectoryLikeSaver(snackbarHostState, name) {
+                            spaceStructure.fileStructure.toZipArchive(spaceStructure.files)
+                        }
                     }
                 }
             }
@@ -134,6 +154,7 @@ fun FileSystem(
     element: FileSystemItem,
     onFileOpen: (FileId) -> Unit,
     files: PersistentMap<FileId, File>,
+    snackbarHostState: SnackbarHostState,
     onChange: (FileSystemItem?, PersistentMap<FileId, File>) -> Unit,
 ): Unit = when (element) {
     is FileSystemItem.RegularFileSystemItem -> FileSystem(
@@ -141,10 +162,18 @@ fun FileSystem(
         element,
         files = files,
         onFileOpen = onFileOpen,
-        onChange = onChange.id<FileSystemItem.RegularFileSystemItem?>()
+        snackbarHostState = snackbarHostState,
+        onChange = onChange.id<FileSystemItem.RegularFileSystemItem?>(),
     )
 
-    is FileSystemItem.Root -> FileSystem(maxOffset, element, onFileOpen, files, onChange.id<FileSystemItem.Root>())
+    is FileSystemItem.Root -> FileSystem(
+        maxOffset,
+        element,
+        onFileOpen,
+        files,
+        snackbarHostState,
+        onChange.id<FileSystemItem.Root>()
+    )
 }
 
 @Composable
@@ -153,6 +182,7 @@ fun FileSystem(
     element: FileSystemItem.Root,
     onFileOpen: (FileId) -> Unit,
     files: PersistentMap<FileId, File>,
+    snackbarHostState: SnackbarHostState,
     onChange: (FileSystemItem.Root, PersistentMap<FileId, File>) -> Unit,
 ): Unit = Column {
     for ((index, subElement) in element.children.withIndex()) {
@@ -161,6 +191,7 @@ fun FileSystem(
             subElement,
             onFileOpen = onFileOpen,
             files = files,
+            snackbarHostState = snackbarHostState,
         ) { newSubElement: FileSystemItem.RegularFileSystemItem?, newFiles ->
             val newChildren =
                 if (newSubElement != null) element.children.set(index, newSubElement)
@@ -177,7 +208,8 @@ fun FileSystem(
     offset: Dp = 0.dp,
     onFileOpen: (FileId) -> Unit,
     files: PersistentMap<FileId, File>,
-    onChange: (FileId?, PersistentMap<FileId, File>) -> Unit
+    snackbarHostState: SnackbarHostState,
+    onChange: (FileId?, PersistentMap<FileId, File>) -> Unit,
 ) {
     val file = files[element] ?: error("File system is corrupted")
     Row(
@@ -210,6 +242,23 @@ fun FileSystem(
             file.name,
             onValueChange = { onChange(element, files.put(element, File(it, file.type, file.content))) }
         )
+        val coroutineScope = rememberCoroutineScope()
+        val saveFileLauncher = rememberFileSaverLauncher { file ->
+            if (file != null) {
+                coroutineScope.launch {
+                    snackbarHostState.showSnackbar("File '${file.name}' was saved")
+                }
+            }
+        }
+        IconButton(onClick = {
+            saveFileLauncher.launch(
+                baseName = file.name,
+                bytes = file.makeFileContent(),
+                extension = file.type.extension
+            )
+        }) {
+            Icon(Icons.Default.Download, "Download")
+        }
         ModifiableListItemDecoration(
             onDeleteItemRequest = { onClose ->
                 DeletionConfirmation(
@@ -224,12 +273,45 @@ fun FileSystem(
 }
 
 @Composable
+private fun DirectoryLikeSaver(
+    snackbarHostState: SnackbarHostState,
+    name: String,
+    toZipArchive: suspend () -> ByteArray
+) {
+    val coroutineScope = rememberCoroutineScope()
+    val saveFileLauncher = rememberFileSaverLauncher { file ->
+        if (file != null) {
+            coroutineScope.launch {
+                snackbarHostState.showSnackbar("ZIP-archive '${file.name}' was saved")
+            }
+        }
+    }
+    IconButton(onClick = {
+        coroutineScope.launch {
+            try {
+                val bytes = toZipArchive()
+                saveFileLauncher.launch(
+                    baseName = name,
+                    bytes = bytes,
+                    extension = "zip",
+                )
+            } catch (e: Throwable) {
+                snackbarHostState.showSnackbar(e.message ?: "An error occurred")
+            }
+        }
+    }) {
+        Icon(Icons.Default.Download, "Download")
+    }
+}
+
+@Composable
 fun FileSystem(
     maxOffset: Dp,
     element: FileSystemItem.Directory,
     offset: Dp = 0.dp,
     onFileOpen: (FileId) -> Unit,
     files: PersistentMap<FileId, File>,
+    snackbarHostState: SnackbarHostState,
     onChange: (FileSystemItem.Directory?, PersistentMap<FileId, File>) -> Unit,
 ): Unit = Column {
     Row(
@@ -275,6 +357,10 @@ fun FileSystem(
             )
         }
 
+        DirectoryLikeSaver(snackbarHostState, element.name) {
+            element.toZipArchive(files)
+        }
+
         ModifiableListItemDecoration(
             onDeleteItemRequest = { onClose ->
                 DeletionConfirmation(
@@ -308,6 +394,7 @@ fun FileSystem(
                     offset = minOf(offset + 48.dp, maxOffset),
                     files = files,
                     onFileOpen = onFileOpen,
+                    snackbarHostState = snackbarHostState,
                 ) { newSubElement: FileSystemItem.RegularFileSystemItem?, newFiles ->
                     val newChildren =
                         if (newSubElement != null) element.children.set(index, newSubElement)
@@ -325,10 +412,11 @@ private fun generateFileId(files: PersistentMap<FileId, File>): FileId =
 @Composable
 private fun CreateFileSystemItemButton(
     files: PersistentMap<FileId, File>,
+    modifier: Modifier = Modifier,
     onFileSystemItem: (FileSystemItem.RegularFileSystemItem, PersistentMap<FileId, File>) -> Unit,
 ) {
     var dropDownMenuExpanded by rememberSaveable { mutableStateOf(false) }
-    Column {
+    Column(modifier) {
         IconButton(onClick = {
             dropDownMenuExpanded = true
         }) {
@@ -369,6 +457,7 @@ fun FileSystem(
     offset: Dp = 0.dp,
     onFileOpen: (FileId) -> Unit,
     files: PersistentMap<FileId, File>,
+    snackbarHostState: SnackbarHostState,
     onChange: (FileSystemItem.RegularFileSystemItem?, PersistentMap<FileId, File>) -> Unit
 ): Unit = when (element) {
     is FileSystemItem.Directory -> FileSystem(
@@ -377,8 +466,9 @@ fun FileSystem(
         offset,
         onFileOpen,
         files,
+        snackbarHostState,
         onChange.id<FileSystemItem.Directory?>()
     )
 
-    is FileId -> FileSystem(element, offset, onFileOpen, files, onChange)
+    is FileId -> FileSystem(element, offset, onFileOpen, files, snackbarHostState, onChange)
 }

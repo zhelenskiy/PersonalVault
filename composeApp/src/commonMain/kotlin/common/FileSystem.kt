@@ -27,6 +27,7 @@ fun interface FileConverter {
 @Serializable
 sealed class FileType {
     val name = this::class.simpleName!!
+    abstract val extension: String
 
     companion object {
         val entries: List<FileType> by lazy { TextFileType.entries }
@@ -36,7 +37,9 @@ sealed class FileType {
 @Serializable
 sealed class TextFileType : FileType() {
     @Serializable
-    data object PlainText : TextFileType()
+    data object PlainText : TextFileType() {
+        override val extension: String get() = "txt"
+    }
     companion object {
         val entries: List<TextFileType> by lazy { listOf(PlainText) + MarkupTextFileType.entries }
     }
@@ -46,10 +49,14 @@ sealed class TextFileType : FileType() {
 sealed class MarkupTextFileType : TextFileType() {
 
     @Serializable
-    data object Markdown : MarkupTextFileType()
+    data object Markdown : MarkupTextFileType() {
+        override val extension: String get() = "md"
+    }
 
     @Serializable
-    data object Html : MarkupTextFileType()
+    data object Html : MarkupTextFileType() {
+        override val extension: String get() = "html"
+    }
 
     companion object {
         val entries: List<MarkupTextFileType> = listOf(Markdown, Html)
@@ -64,6 +71,7 @@ sealed class File {
     @SerialName("fileType")
     abstract val type: FileType
     abstract val content: ByteArray
+    abstract fun makeFileContent(): ByteArray
     open val converters: Map<FileType, FileConverter> get() = emptyMap()
 
     companion object {
@@ -82,6 +90,8 @@ sealed class TextFile : File() {
     @SerialName("fileType")
     abstract override val type: TextFileType
     abstract val text: String
+
+    override fun makeFileContent(): ByteArray = text.encodeToByteArray()
 
     companion object {
         operator fun invoke(name: String, type: TextFileType, content: ByteArray): TextFile = when (type) {
