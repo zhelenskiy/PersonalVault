@@ -1,13 +1,12 @@
 package common
 
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class Versioned<T>(
+data class Versioned<out T>(
     val version: Long?,
     val data: T,
 )

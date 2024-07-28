@@ -4,10 +4,10 @@ import common.*
 import io.github.xxfast.kstore.KStore
 import io.github.xxfast.kstore.file.storeOf
 import kotlinx.collections.immutable.PersistentList
+import kotlinx.collections.immutable.toPersistentList
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import kotlinx.serialization.Serializable
 import okio.Path.Companion.toPath
 import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.io.path.createDirectories
@@ -15,8 +15,8 @@ import kotlin.io.path.createDirectories
 private const val firstCounterValue = Long.MIN_VALUE
 
 class FileSpacesRepository : SpacesRepository {
-    private val kStore: KStore<Versioned<@Serializable(with = PersistentListSerializer::class) PersistentList<EncryptedSpaceInfo>>> =
-        storeOf(file = pathTo("spaces.json").toPath().also { it.parent?.toNioPath()?.createDirectories() })
+    private val kStore: KStore<Versioned<List<EncryptedSpaceInfo>>> =
+        storeOf(file = pathTo("spaces.json").toPath().also { it.parent?.toNioPath()?.createDirectories() }.also { println("Data: $it") })
 
     private val spacesSavingScope: CoroutineScope = CoroutineScope(EmptyCoroutineContext)
 
@@ -24,6 +24,7 @@ class FileSpacesRepository : SpacesRepository {
     override val savedSpacesFlow: StateFlow<Versioned<PersistentList<EncryptedSpaceInfo>>?> = kStore.updates
         .map { it ?: initialValue }
         .catch { it.printStackTrace() }
+        .map { Versioned(version = it.version, data = it.data.toPersistentList()) }
         .stateIn(spacesSavingScope, SharingStarted.Eagerly, null)
  
     @OptIn(OutdatedData::class)

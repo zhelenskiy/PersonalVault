@@ -1,8 +1,8 @@
 package common
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.TextSnippet
 import androidx.compose.material.icons.filled.Html
-import androidx.compose.material.icons.filled.TextSnippet
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import cafe.adriel.voyager.core.lifecycle.JavaSerializable
@@ -16,8 +16,9 @@ import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.Json
-import org.jetbrains.compose.resources.ExperimentalResourceApi
-import org.jetbrains.compose.resources.painterResource
+import org.jetbrains.compose.resources.vectorResource
+import personalvault.composeapp.generated.resources.Res
+import personalvault.composeapp.generated.resources.markdown
 
 fun interface FileConverter {
     fun convert(): File
@@ -182,11 +183,10 @@ sealed class FileSystemItem : JavaSerializable {
     ) : FileSystemItem()
 }
 
-@OptIn(ExperimentalResourceApi::class)
 @Composable
 fun FileType.icon() = when (this) {
-    TextFileType.PlainText -> Icon(Icons.Default.TextSnippet, contentDescription = "Plain text")
-    MarkupTextFileType.Markdown -> Icon(painterResource("markdown.xml"), contentDescription = name)
+    TextFileType.PlainText -> Icon(Icons.AutoMirrored.Filled.TextSnippet, contentDescription = "Plain text")
+    MarkupTextFileType.Markdown -> Icon(vectorResource(Res.drawable.markdown), contentDescription = name)
     MarkupTextFileType.Html -> Icon(Icons.Default.Html, contentDescription = name)
 }
 

@@ -8,10 +8,10 @@ import androidx.compose.ui.window.rememberWindowState
 import editor.FxEventLoopReactivizer
 import editor.LocalWindow
 import editor.fakeWebView
-import org.jetbrains.compose.resources.ExperimentalResourceApi
 import org.jetbrains.compose.resources.painterResource
+import personalvault.composeapp.generated.resources.Res
+import personalvault.composeapp.generated.resources.encrypted
 
-@OptIn(ExperimentalResourceApi::class)
 fun main() = application {
     val fxEventLoopReactivizer = remember {
         FxEventLoopReactivizer(start = true)
@@ -19,7 +19,7 @@ fun main() = application {
     Window(
         onCloseRequest = { exitApplication(); fxEventLoopReactivizer.finish() },
         title = "PersonalVault",
-        icon = painterResource("encrypted.xml"),
+        icon = painterResource(Res.drawable.encrypted),
         state = rememberWindowState(width = 900.dp, height = 675.dp)
     ) {
         CompositionLocalProvider(LocalWindow provides window) {

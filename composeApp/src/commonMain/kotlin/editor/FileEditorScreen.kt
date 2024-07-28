@@ -10,6 +10,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.FormatListBulleted
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -46,7 +48,9 @@ import org.intellij.markdown.flavours.gfm.GFMFlavourDescriptor
 import org.intellij.markdown.html.HtmlGenerator
 import org.intellij.markdown.parser.MarkdownParser
 import org.jetbrains.compose.resources.ExperimentalResourceApi
-import org.jetbrains.compose.resources.painterResource
+import org.jetbrains.compose.resources.vectorResource
+import personalvault.composeapp.generated.resources.Res
+import personalvault.composeapp.generated.resources.code_blocks
 import kotlin.time.Duration.Companion.seconds
 
 class FileEditorScreen(private val index: Int, private val cryptoKey: PrivateKey, private val fileId: FileId) : Screen {
@@ -81,7 +85,7 @@ fun FileEditorScreenContent(
             CenterAlignedTopAppBar(
                 navigationIcon = {
                     IconButton(onClick = backPress) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
                 title = {
@@ -336,7 +340,7 @@ private fun MarkedUpTextFileEditor(
                         modifier = Modifier.focusProperties { canFocus = false },
                         onClick = { onTextFieldValueChange(actions.listBulleted.applyAction(textFieldValue)) },
                     ) {
-                        Icon(Icons.Default.FormatListBulleted, contentDescription = "List bulleted")
+                        Icon(Icons.AutoMirrored.Filled.FormatListBulleted, contentDescription = "List bulleted")
                     }
                     IconButton(
                         modifier = Modifier.focusProperties { canFocus = false },
@@ -366,7 +370,7 @@ private fun MarkedUpTextFileEditor(
                         modifier = Modifier.focusProperties { canFocus = false },
                         onClick = { onTextFieldValueChange(actions.codeBlock.applyAction(textFieldValue)) },
                     ) {
-                        Icon(painterResource("code_blocks.xml"), contentDescription = "Code block")
+                        Icon(vectorResource(Res.drawable.code_blocks), contentDescription = "Code block")
                     }
 
                     CopyHtmlIconButton(fileType, textFieldValue)
