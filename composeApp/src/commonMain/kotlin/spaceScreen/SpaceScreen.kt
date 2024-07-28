@@ -2,8 +2,10 @@ package spaceScreen
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.verticalScroll
@@ -27,8 +29,16 @@ import common.FileSystemItem.FileId
 import editor.FileEditorScreen
 import kotlinx.collections.immutable.persistentListOf
 import crypto.PrivateKey
+import io.github.vinceglb.filekit.compose.rememberFilePickerLauncher
 import io.github.vinceglb.filekit.compose.rememberFileSaverLauncher
+import io.github.vinceglb.filekit.core.PickerMode
+import io.github.vinceglb.filekit.core.PickerType
+import io.github.vinceglb.filekit.core.baseName
+import io.github.vinceglb.filekit.core.extension
 import kotlinx.collections.immutable.PersistentMap
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.launch
 import kotlin.random.Random
 
@@ -52,7 +62,7 @@ class SpaceScreen(private val index: Int, private val cryptoKey: PrivateKey) : S
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun SpaceScreenContent(
     name: String, onNameChange: (String) -> Unit,
@@ -116,27 +126,42 @@ fun SpaceScreenContent(
                         },
                     )
                 }
-                Box(Modifier.fillMaxWidth()) {
-                    CreateFileSystemItemButton(
-                        spaceStructure.files,
-                        Modifier.align(Alignment.Center)
-                    ) { newItem, newFiles ->
-                        onSpaceStructureChange(
-                            SpaceStructure(
-                                FileSystemItem.Root(
-                                    spaceStructure.fileStructure.children.add(newItem)
-                                ), newFiles
+                LazyRow(
+                    modifier = Modifier.animateContentWidth().fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = if (spaceStructure.fileStructure.children.isNotEmpty()) Arrangement.End else Arrangement.SpaceEvenly,
+                ) {
+                    item {
+                        CreateFileSystemItemButton(
+                            spaceStructure.files,
+                            modifier = Modifier.animateItemPlacement(),
+                        ) { newItem, newFiles ->
+                            onSpaceStructureChange(
+                                SpaceStructure(
+                                    FileSystemItem.Root(
+                                        spaceStructure.fileStructure.children.add(newItem)
+                                    ), newFiles
+                                )
                             )
-                        )
+                        }
                     }
-                    androidx.compose.animation.AnimatedVisibility(
-                        visible = spaceStructure.fileStructure.children.isNotEmpty(),
-                        enter = fadeIn(),
-                        exit = fadeOut(),
-                        modifier = Modifier.align(Alignment.CenterEnd),
-                    ) {
-                        DirectoryLikeSaver(snackbarHostState, name) {
-                            spaceStructure.fileStructure.toZipArchive(spaceStructure.files)
+
+                    item {
+                        FileOpener(snackbarHostState, modifier = Modifier.animateItemPlacement()) { files ->
+                            val newSpaceStructure = files.fold(spaceStructure) { spaceStructure, file ->
+                                val fileId = generateFileId(spaceStructure.files)
+                                val children = spaceStructure.fileStructure.children.add(fileId)
+                                SpaceStructure(FileSystemItem.Root(children), spaceStructure.files.put(fileId, file))
+                            }
+                            onSpaceStructureChange(newSpaceStructure)
+                        }
+                    }
+
+                    if (spaceStructure.fileStructure.children.isNotEmpty()) {
+                        item {
+                            DirectoryLikeSaver(snackbarHostState, name, modifier = Modifier.animateItemPlacement()) {
+                                spaceStructure.fileStructure.toZipArchive(spaceStructure.files)
+                            }
                         }
                     }
                 }
@@ -276,6 +301,7 @@ fun FileSystem(
 private fun DirectoryLikeSaver(
     snackbarHostState: SnackbarHostState,
     name: String,
+    modifier: Modifier = Modifier,
     toZipArchive: suspend () -> ByteArray
 ) {
     val coroutineScope = rememberCoroutineScope()
@@ -286,7 +312,7 @@ private fun DirectoryLikeSaver(
             }
         }
     }
-    IconButton(onClick = {
+    IconButton(modifier = modifier, onClick = {
         coroutineScope.launch {
             try {
                 val bytes = toZipArchive()
@@ -301,6 +327,45 @@ private fun DirectoryLikeSaver(
         }
     }) {
         Icon(Icons.Default.Download, "Download")
+    }
+}
+
+@Composable
+private fun FileOpener(
+    snackbarHostState: SnackbarHostState,
+    modifier: Modifier = Modifier,
+    onFilesOpen: (List<File>) -> Unit,
+) {
+    val coroutineScope = rememberCoroutineScope()
+    val filePickerLauncher = rememberFilePickerLauncher(
+        type = PickerType.File(),
+        mode = PickerMode.Multiple(),
+        title = "Upload files",
+    ) { nativeFiles ->
+        if (nativeFiles == null) return@rememberFilePickerLauncher
+        coroutineScope.launch {
+            val files = try {
+                nativeFiles.map {
+                    val name = it.baseName
+                    val bytes = it.readBytes()
+                    when (val extension = it.extension) {
+                        "html", "htm" -> MarkupTextFile(name, MarkupTextFileType.Html, text = bytes.decodeToString())
+                        "md" -> MarkupTextFile(name, MarkupTextFileType.Markdown, text = bytes.decodeToString())
+                        "txt" -> PlainTextFile(name, text = bytes.decodeToString())
+                        else -> throw IllegalArgumentException("Unsupported file extension '$extension'")
+                    }
+                }
+            } catch (e: CancellationException) {
+                return@launch
+            } catch (e: Throwable) {
+                snackbarHostState.showSnackbar(e.message ?: "An error occurred")
+                return@launch
+            }
+            onFilesOpen(files)
+        }
+    }
+    IconButton(modifier = modifier, onClick = { filePickerLauncher.launch() }) {
+        Icon(Icons.Default.UploadFile, "Upload files")
     }
 }
 
@@ -355,6 +420,16 @@ fun FileSystem(
                 FileSystemItem.Directory(element.name, element.children.add(newItem), element.isCollapsed),
                 newFiles
             )
+        }
+
+        FileOpener(snackbarHostState) { newFiles ->
+            val (newDirectory, newMapping) = newFiles.fold(element to files) { (directory, mapping), file ->
+                val fileId = generateFileId(mapping)
+                val newDirectory = FileSystemItem.Directory(directory.name, directory.children.add(fileId), directory.isCollapsed)
+                val newMapping = mapping.put(fileId, file)
+                newDirectory to newMapping
+            }
+            onChange(newDirectory, newMapping)
         }
 
         DirectoryLikeSaver(snackbarHostState, element.name) {
