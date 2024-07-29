@@ -15,9 +15,13 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
@@ -36,10 +40,7 @@ import io.github.vinceglb.filekit.core.PickerType
 import io.github.vinceglb.filekit.core.baseName
 import io.github.vinceglb.filekit.core.extension
 import kotlinx.collections.immutable.PersistentMap
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
 import kotlin.random.Random
 
 class SpaceScreen(private val index: Int, private val cryptoKey: PrivateKey) : Screen {
@@ -50,6 +51,7 @@ class SpaceScreen(private val index: Int, private val cryptoKey: PrivateKey) : S
         val spaceStructure by screenModel.spaceFileSystemFlow.collectAsState()
         val name by screenModel.spaceNameFlow.collectAsState()
         val isSaving by screenModel.isSaving.collectAsState()
+        val blockingFiles = remember { mutableStateMapOf<FileId, Unit>() }
         SpaceScreenContent(
             name = name,
             onNameChange = { screenModel.setName(screenModel.getNewVersionNumber(), it) },
@@ -58,6 +60,7 @@ class SpaceScreen(private val index: Int, private val cryptoKey: PrivateKey) : S
             onBackPress = { navigator.pop() },
             onFileOpen = { navigator += FileEditorScreen(index, cryptoKey, it) },
             isSaving = isSaving,
+            blockingFiles = blockingFiles,
         )
     }
 }
@@ -70,6 +73,7 @@ fun SpaceScreenContent(
     onBackPress: () -> Unit,
     onFileOpen: (FileId) -> Unit,
     isSaving: Boolean,
+    blockingFiles: SnapshotStateMap<FileId, Unit>,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     Scaffold(
@@ -81,7 +85,7 @@ fun SpaceScreenContent(
                     }
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBackPress) {
+                    IconButton(onClick = onBackPress, enabled = blockingFiles.isEmpty()) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back to space list"
@@ -121,6 +125,7 @@ fun SpaceScreenContent(
                         onFileOpen = onFileOpen,
                         files = spaceStructure.files,
                         snackbarHostState = snackbarHostState,
+                        blockingFiles = blockingFiles,
                         onChange = { root: FileSystemItem.Root, files ->
                             onSpaceStructureChange(SpaceStructure(root, files))
                         },
@@ -134,6 +139,7 @@ fun SpaceScreenContent(
                     item {
                         CreateFileSystemItemButton(
                             spaceStructure.files,
+                            blockingFiles = blockingFiles,
                             modifier = Modifier.animateItemPlacement(),
                         ) { newItem, newFiles ->
                             onSpaceStructureChange(
@@ -147,7 +153,7 @@ fun SpaceScreenContent(
                     }
 
                     item {
-                        FileOpener(snackbarHostState, modifier = Modifier.animateItemPlacement()) { files ->
+                        FileOpener(snackbarHostState, blockingFiles = blockingFiles, modifier = Modifier.animateItemPlacement()) { files ->
                             val newSpaceStructure = files.fold(spaceStructure) { spaceStructure, file ->
                                 val fileId = generateFileId(spaceStructure.files)
                                 val children = spaceStructure.fileStructure.children.add(fileId)
@@ -159,7 +165,7 @@ fun SpaceScreenContent(
 
                     if (spaceStructure.fileStructure.children.isNotEmpty()) {
                         item {
-                            DirectoryLikeSaver(snackbarHostState, name, modifier = Modifier.animateItemPlacement()) {
+                            DirectoryLikeSaver(snackbarHostState, name, blockingFiles = blockingFiles, modifier = Modifier.animateItemPlacement()) {
                                 spaceStructure.fileStructure.toZipArchive(spaceStructure.files)
                             }
                         }
@@ -180,6 +186,7 @@ fun FileSystem(
     onFileOpen: (FileId) -> Unit,
     files: PersistentMap<FileId, File>,
     snackbarHostState: SnackbarHostState,
+    blockingFiles: SnapshotStateMap<FileId, Unit>,
     onChange: (FileSystemItem?, PersistentMap<FileId, File>) -> Unit,
 ): Unit = when (element) {
     is FileSystemItem.RegularFileSystemItem -> FileSystem(
@@ -188,6 +195,7 @@ fun FileSystem(
         files = files,
         onFileOpen = onFileOpen,
         snackbarHostState = snackbarHostState,
+        blockingFiles = blockingFiles,
         onChange = onChange.id<FileSystemItem.RegularFileSystemItem?>(),
     )
 
@@ -197,6 +205,7 @@ fun FileSystem(
         onFileOpen,
         files,
         snackbarHostState,
+        blockingFiles,
         onChange.id<FileSystemItem.Root>()
     )
 }
@@ -208,6 +217,7 @@ fun FileSystem(
     onFileOpen: (FileId) -> Unit,
     files: PersistentMap<FileId, File>,
     snackbarHostState: SnackbarHostState,
+    blockingFiles: SnapshotStateMap<FileId, Unit>,
     onChange: (FileSystemItem.Root, PersistentMap<FileId, File>) -> Unit,
 ): Unit = Column {
     for ((index, subElement) in element.children.withIndex()) {
@@ -217,6 +227,7 @@ fun FileSystem(
             onFileOpen = onFileOpen,
             files = files,
             snackbarHostState = snackbarHostState,
+            blockingFiles = blockingFiles,
         ) { newSubElement: FileSystemItem.RegularFileSystemItem?, newFiles ->
             val newChildren =
                 if (newSubElement != null) element.children.set(index, newSubElement)
@@ -234,40 +245,82 @@ fun FileSystem(
     onFileOpen: (FileId) -> Unit,
     files: PersistentMap<FileId, File>,
     snackbarHostState: SnackbarHostState,
+    blockingFiles: SnapshotStateMap<FileId, Unit>,
     onChange: (FileId?, PersistentMap<FileId, File>) -> Unit,
 ) {
     val file = files[element] ?: error("File system is corrupted")
+    val coroutineScope = rememberCoroutineScope()
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.clickable { onFileOpen(element) },
+        modifier = Modifier.clickable(enabled = blockingFiles.isEmpty()) { onFileOpen(element) },
     ) {
         Spacer(Modifier.width(offset))
         Spacer(Modifier.width(48.dp))
-        var changeTypeExpanded by rememberSaveable { mutableStateOf(false) }
-        val availableConverters = file.converters
-        IconButton(onClick = { changeTypeExpanded = true }, enabled = availableConverters.isNotEmpty()) {
-            file.type.icon()
-            DropdownMenu(
-                expanded = changeTypeExpanded,
-                onDismissRequest = { changeTypeExpanded = false },
-            ) {
-                for ((fileType, converter) in availableConverters.entries) {
-                    DropdownMenuItem(
-                        text = { Text(fileType.name) },
-                        onClick = {
-                            onChange(element, files.put(element, converter.convert()))
-                            changeTypeExpanded = false
-                        },
-                        leadingIcon = { fileType.icon() }
-                    )
-                }
+        file.type.icon()
+        val (rawName, onRawNameChange) = rememberSaveable(file.name, file.type) {
+            mutableStateOf("${file.name}.${file.type.extension}")
+        }
+        val newExtension = rawName.substringAfterLast('.', "")
+        var formatChangeWarningVisible by remember { mutableStateOf(false) }
+        val focusRequester = remember { FocusRequester() }
+        CardTextField(rawName, onRawNameChange, modifier = Modifier.focusRequester(focusRequester).onFocusChanged {
+            if (!it.hasFocus && newExtension != file.type.extension) formatChangeWarningVisible = true
+        })
+        LaunchedEffect(rawName) {
+            val baseName = rawName.substringBeforeLast('.')
+            onChange(element, files.put(element, File(baseName, file.type, file.content)))
+        }
+
+        // todo report crash
+//        LaunchedEffect(newExtension != file.type.extension) {
+//            if (newExtension != file.type.extension) {
+//                blockingFiles[element] = Unit
+//            } else {
+//                blockingFiles -= element
+//            }
+//        }
+        AnimatedVisibility(
+            visible = newExtension != file.type.extension,
+        ) {
+            IconButton(onClick = { formatChangeWarningVisible = true }) {
+                Icon(Icons.Default.Warning, "Format change warning")
             }
         }
-        CardTextField(
-            file.name,
-            onValueChange = { onChange(element, files.put(element, File(it, file.type, file.content))) }
-        )
-        val coroutineScope = rememberCoroutineScope()
+        if (formatChangeWarningVisible) {
+            AlertDialog(
+                text = { Text("Do you really want to convert file from .${file.type.extension} to .$newExtension?") },
+                onDismissRequest = {
+                    formatChangeWarningVisible = false
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            try {
+                                val converted = file.convert(getFileTypeByExtension(newExtension))
+                                onChange(element, files.put(element, converted))
+                                formatChangeWarningVisible = false
+                            } catch (e: Throwable) {
+                                e.printStackTrace()
+                                coroutineScope.launch {
+                                    snackbarHostState.showSnackbar(e.message ?: "An error occured")
+                                }
+                            }
+                        },
+                    ) {
+                        Text("Change")
+                    }
+                },
+                dismissButton = {
+                    Button(onClick = {
+                        onRawNameChange("${rawName.substringBeforeLast('.')}.${file.type.extension}")
+                        formatChangeWarningVisible = false
+                    }) {
+                        Text("Revert")
+                    }
+                }
+            )
+        }
+
         val saveFileLauncher = rememberFileSaverLauncher { file ->
             if (file != null) {
                 coroutineScope.launch {
@@ -275,7 +328,7 @@ fun FileSystem(
                 }
             }
         }
-        IconButton(onClick = {
+        IconButton(enabled = blockingFiles.isEmpty(), onClick = {
             saveFileLauncher.launch(
                 baseName = file.name,
                 bytes = file.makeFileContent(),
@@ -285,6 +338,7 @@ fun FileSystem(
             Icon(Icons.Default.Download, "Download")
         }
         ModifiableListItemDecoration(
+            onDeleteItemEnabled = blockingFiles.isEmpty(),
             onDeleteItemRequest = { onClose ->
                 DeletionConfirmation(
                     windowTitle = "Deleting file",
@@ -302,6 +356,7 @@ private fun DirectoryLikeSaver(
     snackbarHostState: SnackbarHostState,
     name: String,
     modifier: Modifier = Modifier,
+    blockingFiles: SnapshotStateMap<FileId, Unit>,
     toZipArchive: suspend () -> ByteArray
 ) {
     val coroutineScope = rememberCoroutineScope()
@@ -312,7 +367,7 @@ private fun DirectoryLikeSaver(
             }
         }
     }
-    IconButton(modifier = modifier, onClick = {
+    IconButton(modifier = modifier, enabled = blockingFiles.isEmpty(), onClick = {
         coroutineScope.launch {
             try {
                 val bytes = toZipArchive()
@@ -334,6 +389,7 @@ private fun DirectoryLikeSaver(
 private fun FileOpener(
     snackbarHostState: SnackbarHostState,
     modifier: Modifier = Modifier,
+    blockingFiles: SnapshotStateMap<FileId, Unit>,
     onFilesOpen: (List<File>) -> Unit,
 ) {
     val coroutineScope = rememberCoroutineScope()
@@ -348,12 +404,7 @@ private fun FileOpener(
                 nativeFiles.map {
                     val name = it.baseName
                     val bytes = it.readBytes()
-                    when (val extension = it.extension) {
-                        "html", "htm" -> MarkupTextFile(name, MarkupTextFileType.Html, text = bytes.decodeToString())
-                        "md" -> MarkupTextFile(name, MarkupTextFileType.Markdown, text = bytes.decodeToString())
-                        "txt" -> PlainTextFile(name, text = bytes.decodeToString())
-                        else -> throw IllegalArgumentException("Unsupported file extension '$extension'")
-                    }
+                    File.createFromRealFile(name, it.extension, bytes)
                 }
             } catch (e: CancellationException) {
                 return@launch
@@ -364,7 +415,7 @@ private fun FileOpener(
             onFilesOpen(files)
         }
     }
-    IconButton(modifier = modifier, onClick = { filePickerLauncher.launch() }) {
+    IconButton(modifier = modifier, enabled = blockingFiles.isEmpty(), onClick = { filePickerLauncher.launch() }) {
         Icon(Icons.Default.UploadFile, "Upload files")
     }
 }
@@ -377,6 +428,7 @@ fun FileSystem(
     onFileOpen: (FileId) -> Unit,
     files: PersistentMap<FileId, File>,
     snackbarHostState: SnackbarHostState,
+    blockingFiles: SnapshotStateMap<FileId, Unit>,
     onChange: (FileSystemItem.Directory?, PersistentMap<FileId, File>) -> Unit,
 ): Unit = Column {
     Row(
@@ -385,7 +437,7 @@ fun FileSystem(
         Spacer(Modifier.width(offset))
 
         val rotation by animateFloatAsState(targetValue = if (element.isCollapsed) -90f else 0f)
-        IconButton(onClick = {
+        IconButton(enabled = blockingFiles.isEmpty(), onClick = {
             val directory = FileSystemItem.Directory(
                 element.name,
                 element.children,
@@ -415,28 +467,30 @@ fun FileSystem(
             }
         )
 
-        CreateFileSystemItemButton(files) { newItem, newFiles ->
+        CreateFileSystemItemButton(files, blockingFiles = blockingFiles) { newItem, newFiles ->
             onChange(
                 FileSystemItem.Directory(element.name, element.children.add(newItem), element.isCollapsed),
                 newFiles
             )
         }
 
-        FileOpener(snackbarHostState) { newFiles ->
+        FileOpener(snackbarHostState, blockingFiles = blockingFiles) { newFiles ->
             val (newDirectory, newMapping) = newFiles.fold(element to files) { (directory, mapping), file ->
                 val fileId = generateFileId(mapping)
-                val newDirectory = FileSystemItem.Directory(directory.name, directory.children.add(fileId), directory.isCollapsed)
+                val newDirectory =
+                    FileSystemItem.Directory(directory.name, directory.children.add(fileId), directory.isCollapsed)
                 val newMapping = mapping.put(fileId, file)
                 newDirectory to newMapping
             }
             onChange(newDirectory, newMapping)
         }
 
-        DirectoryLikeSaver(snackbarHostState, element.name) {
+        DirectoryLikeSaver(snackbarHostState, element.name, blockingFiles = blockingFiles) {
             element.toZipArchive(files)
         }
 
         ModifiableListItemDecoration(
+//            onDeleteItemEnabled = blockingFiles.isEmpty(),
             onDeleteItemRequest = { onClose ->
                 DeletionConfirmation(
                     windowTitle = "Deleting folder",
@@ -470,6 +524,7 @@ fun FileSystem(
                     files = files,
                     onFileOpen = onFileOpen,
                     snackbarHostState = snackbarHostState,
+                    blockingFiles = blockingFiles,
                 ) { newSubElement: FileSystemItem.RegularFileSystemItem?, newFiles ->
                     val newChildren =
                         if (newSubElement != null) element.children.set(index, newSubElement)
@@ -488,11 +543,12 @@ private fun generateFileId(files: PersistentMap<FileId, File>): FileId =
 private fun CreateFileSystemItemButton(
     files: PersistentMap<FileId, File>,
     modifier: Modifier = Modifier,
+    blockingFiles: SnapshotStateMap<FileId, Unit>,
     onFileSystemItem: (FileSystemItem.RegularFileSystemItem, PersistentMap<FileId, File>) -> Unit,
 ) {
     var dropDownMenuExpanded by rememberSaveable { mutableStateOf(false) }
     Column(modifier) {
-        IconButton(onClick = {
+        IconButton(enabled = blockingFiles.isEmpty(), onClick = {
             dropDownMenuExpanded = true
         }) {
             Icon(Icons.Default.Add, contentDescription = "New folder")
@@ -509,7 +565,7 @@ private fun CreateFileSystemItemButton(
                     dropDownMenuExpanded = false
                 }
             )
-            for (fileType in FileType.entries) {
+            for (fileType in TextFileType.entries) {
                 DropdownMenuItem(
                     text = { Text(fileType.name) },
                     onClick = {
@@ -533,6 +589,7 @@ fun FileSystem(
     onFileOpen: (FileId) -> Unit,
     files: PersistentMap<FileId, File>,
     snackbarHostState: SnackbarHostState,
+    blockingFiles: SnapshotStateMap<FileId, Unit>,
     onChange: (FileSystemItem.RegularFileSystemItem?, PersistentMap<FileId, File>) -> Unit
 ): Unit = when (element) {
     is FileSystemItem.Directory -> FileSystem(
@@ -542,8 +599,9 @@ fun FileSystem(
         onFileOpen,
         files,
         snackbarHostState,
+        blockingFiles,
         onChange.id<FileSystemItem.Directory?>()
     )
 
-    is FileId -> FileSystem(element, offset, onFileOpen, files, snackbarHostState, onChange)
+    is FileId -> FileSystem(element, offset, onFileOpen, files, snackbarHostState, blockingFiles, onChange)
 }

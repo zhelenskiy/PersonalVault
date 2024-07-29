@@ -2,10 +2,8 @@ package editor
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
-import androidx.compose.foundation.background
-import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -21,6 +19,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
@@ -30,6 +30,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.input.getSelectedText
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -42,8 +43,11 @@ import com.godaddy.android.colorpicker.HsvColor
 import common.*
 import common.FileSystemItem.FileId
 import crypto.PrivateKey
+import kotlinlang.compose.*
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.intellij.markdown.flavours.gfm.GFMFlavourDescriptor
 import org.intellij.markdown.html.HtmlGenerator
 import org.intellij.markdown.parser.MarkdownParser
@@ -80,6 +84,11 @@ fun FileEditorScreenContent(
     onFileChanged: (file: File) -> Unit,
     isSaving: Boolean,
 ) {
+    val snackbarHostState = remember { SnackbarHostState() }
+    val openableRasterImageFormats = setOf(
+        "bmp", "gif", "heif", "ico", "jpeg", "jpg", "png", "wbmp", "webp"
+    )
+    val openableImageFormats = openableRasterImageFormats + "svg"
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
@@ -93,7 +102,10 @@ fun FileEditorScreenContent(
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.width(IntrinsicSize.Min)) {
                         file.type.icon()
                         Spacer(Modifier.width(8.dp))
-                        CardTextField(file.name) { onFileChanged(File(it, file.type, file.content)) }
+                        CardTextField(
+                            value = file.name,
+                            onValueChange = { onFileChanged(File(it, file.type, file.content)) }
+                        )
                     }
                 },
                 actions = {
@@ -101,24 +113,66 @@ fun FileEditorScreenContent(
                         SyncIndicator()
                     }
 
+                    if (file is TextFile || file is BinaryFile && (file.type.extension.lowercase() in openableImageFormats)) {
+                        IconButton(onClick = { openFileInDefaultApp(file) }) {
+                            Icon(Icons.Default.FileOpen, "Open in external application")
+                        }
+                    }
+
                     IconButton(onClick = onHomePress) {
                         Icon(Icons.Default.Home, contentDescription = "To start page")
                     }
                 },
             )
-        }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
     ) {
         Box(Modifier.windowInsetsPadding(WindowInsets.ime).padding(it)) {
             when (file) {
                 null -> {}
-                is TextFile -> TextFileEditor(file, onFileChanged)
+                is TextFile -> TextFileEditor(file, onFileChanged, snackbarHostState)
+                is BinaryFile -> when (file.type.extension.lowercase()) {
+                    in openableRasterImageFormats -> {
+                        var bitmap by remember { mutableStateOf<ImageBitmap?>(null) }
+                        LaunchedEffect(file) {
+                            try {
+                                bitmap = withContext(Dispatchers.Default) {
+                                    file.makeFileContent().toImageBitmap()
+                                }
+                            } catch (e: Throwable) {
+                                snackbarHostState.showSnackbar(e.message ?: "An error occurred")
+                            }
+                        }
+                        bitmap?.let { Image(it, null, modifier = Modifier.fillMaxSize()) } ?: FallbackFileView(file)
+                    }
+                    "svg" -> SvgImage(file.makeFileContent(), Modifier.fillMaxSize())
+
+                    else -> FallbackFileView(file)
+                }
             }
         }
     }
 }
 
+expect fun ByteArray.toImageBitmap(): ImageBitmap
+
 @Composable
-fun TextFileEditor(file: TextFile, onFileChanged: (TextFile) -> Unit) {
+expect fun SvgImage(byteArray: ByteArray, modifier: Modifier = Modifier)
+
+@Composable
+fun FallbackFileView(file: BinaryFile) {
+    Box(
+        modifier = Modifier.fillMaxSize().clickable { openFileInDefaultApp(file) },
+        contentAlignment = Alignment.Center
+    ) {
+        Text("Open in external editor")
+    }
+}
+
+expect fun openFileInDefaultApp(file: File)
+
+@Composable
+fun TextFileEditor(file: TextFile, onFileChanged: (TextFile) -> Unit, snackbarHostState: SnackbarHostState) {
     val (textFieldValue, onTextFieldValueChange) = remember { mutableStateOf(TextFieldValue(file.text)) }
     LaunchedEffect(textFieldValue.text) {
         if (file.text != textFieldValue.text) {
@@ -133,6 +187,13 @@ fun TextFileEditor(file: TextFile, onFileChanged: (TextFile) -> Unit) {
                 )
 
                 is PlainTextFile -> onFileChanged(PlainTextFile(name = file.name, text = textFieldValue.text))
+                is SourceCodeFile -> onFileChanged(
+                    SourceCodeFile(
+                        name = file.name,
+                        type = file.type,
+                        text = textFieldValue.text
+                    )
+                )
             }
         }
     }
@@ -156,6 +217,23 @@ fun TextFileEditor(file: TextFile, onFileChanged: (TextFile) -> Unit) {
 
         is PlainTextFile -> PlainTextFileEditor(
             textFieldValue, FontFamily.Default, onTextFieldValueChange = onTextFieldValueChange
+        )
+
+        is SourceCodeFile -> if (file.type.extension.lowercase() in listOf("kt", "kts")) {
+            KotlinSourceEditor(
+                textFieldValue = textFieldValue,
+                onTextFieldValueChange = onTextFieldValueChange,
+                colorScheme = makeLightColorScheme(
+                    ReplaceButtonsColorScheme(
+                        backgroundColor = ButtonDefaults.buttonColors().containerColor,
+                        textColor = ButtonDefaults.buttonColors().contentColor
+                    )
+                ),
+                sourceEditorFeaturesConfiguration = KotlinSourceEditorFeaturesConfiguration(),
+                snackbarHostState = snackbarHostState,
+            )
+        } else PlainTextFileEditor(
+            textFieldValue, FontFamily.Monospace, onTextFieldValueChange = onTextFieldValueChange
         )
     }
 }

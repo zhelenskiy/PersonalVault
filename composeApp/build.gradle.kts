@@ -32,6 +32,7 @@ kotlin {
             implementation(libs.bouncycastle)
             implementation(libs.androidx.startup.runtime)
             implementation(libs.kotlin.coroutines.android)
+            implementation(libs.android.svg)
         }
         commonMain.dependencies {
             implementation(compose.runtime)
@@ -54,7 +55,8 @@ kotlin {
             implementation(libs.kstore.file)
             implementation(libs.kotlin.coroutines.core)
             implementation(libs.compose.animate.single.dimension)
-            implementation("io.github.vinceglb:filekit-compose:0.7.0")
+            implementation(libs.file.kit)
+            implementation(libs.editor.kotlin)
         }
         desktopMain.dependencies {
             nativeJavaFx()
@@ -65,6 +67,7 @@ kotlin {
             implementation(libs.bouncycastle)
             implementation(libs.appdirs)
             implementation(libs.kotlin.coroutines.swing)
+            implementation(libs.junique)
         }
     }
 }

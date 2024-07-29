@@ -39,8 +39,10 @@ import androidx.compose.ui.unit.dp
 
 @Composable
 fun ModifiableListItemDecoration(
-    onChangeItemRequest: @Composable() ((onEnd: () -> Unit) -> Unit)? = null,
-    onDeleteItemRequest: @Composable() ((onEnd: () -> Unit) -> Unit)? = null,
+    onChangeItemRequest: @Composable ((onEnd: () -> Unit) -> Unit)? = null,
+    onDeleteItemRequest: @Composable ((onEnd: () -> Unit) -> Unit)? = null,
+    onChangeItemEnabled: Boolean = true,
+    onDeleteItemEnabled: Boolean = true,
 ) {
     var changeIsActive by rememberSaveable { mutableStateOf(false) }
     var deleteIsActive by rememberSaveable { mutableStateOf(false) }
@@ -48,7 +50,8 @@ fun ModifiableListItemDecoration(
     if (onChangeItemRequest != null) {
         IconButton(
             onClick = { changeIsActive = true },
-            modifier = Modifier
+            modifier = Modifier,
+            enabled = onChangeItemEnabled,
         ) {
             Icon(Icons.Default.Edit, "Edit")
         }
@@ -60,7 +63,8 @@ fun ModifiableListItemDecoration(
     if (onDeleteItemRequest != null) {
         IconButton(
             onClick = { deleteIsActive = true },
-            modifier = Modifier
+            modifier = Modifier,
+            enabled = onDeleteItemEnabled,
         ) {
             Icon(Icons.Default.Delete, "Delete")
         }
@@ -200,18 +204,19 @@ fun DialogButtons(
     }
 }
 
-@OptIn(ExperimentalComposeUiApi::class, ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RowScope.CardTextField(
     value: String,
     onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
     val interactionSource = remember { MutableInteractionSource() }
     val enabled = true
     val singleLine = true
-    Box(Modifier.weight(1f).padding(start = 8.dp)) {
+    Box(modifier.weight(1f).padding(start = 8.dp)) {
         val textMeasurer = rememberTextMeasurer()
         var width by remember { mutableStateOf(0) }
         val textStyle = MaterialTheme.typography.titleMedium
