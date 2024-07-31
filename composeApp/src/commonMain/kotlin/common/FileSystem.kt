@@ -23,19 +23,23 @@ import personalvault.composeapp.generated.resources.unknown_document
 
 @Serializable
 sealed class FileType {
-    abstract val extension: String
+    abstract val extension: String?
 }
 
-fun getFileTypeByExtension(extension: String) = when (extension) {
-    "html", "htm" -> MarkupTextFileType.Html
+private val json = Json { ignoreUnknownKeys = true }
+
+fun getFileTypeByExtension(extension: String?) = when (extension) {
+    "html" -> MarkupTextFileType.Html
+    "htm" -> MarkupTextFileType.Htm
     "md" -> MarkupTextFileType.Markdown
     "txt" -> TextFileType.PlainText
+    null -> BinaryFileType(null)
     in sourceCodeExtensions -> TextFileType.SourceCodeFileType(extension)
     else -> BinaryFileType(extension)
 }
 
 @Serializable
-data class BinaryFileType(override val extension: String) : FileType()
+data class BinaryFileType(override val extension: String?) : FileType()
 
 @Serializable
 sealed class TextFileType : FileType() {
@@ -48,10 +52,6 @@ sealed class TextFileType : FileType() {
 
     @Serializable
     data class SourceCodeFileType(override val extension: String) : TextFileType()
-
-    companion object {
-        val entries: List<TextFileType> by lazy { listOf(PlainText) + MarkupTextFileType.entries }
-    }
 }
 
 @Serializable
@@ -67,8 +67,9 @@ sealed class MarkupTextFileType : TextFileType() {
         override val extension: String get() = "html"
     }
 
-    companion object {
-        val entries: List<MarkupTextFileType> = listOf(Markdown, Html)
+    @Serializable
+    data object Htm : MarkupTextFileType() {
+        override val extension: String get() = "htm"
     }
 }
 
@@ -95,7 +96,7 @@ sealed class File {
         }
 
 
-        fun createFromRealFile(baseName: String, extension: String, content: ByteArray): File = when (val type = getFileTypeByExtension(extension)) {
+        fun createFromRealFile(baseName: String, extension: String?, content: ByteArray): File = when (val type = getFileTypeByExtension(extension)) {
             is TextFileType -> TextFile(baseName, type, text = content.decodeToString())
             is BinaryFileType -> BinaryFile(baseName, type, content)
         }
@@ -190,10 +191,10 @@ class MarkupTextFile private constructor(
         val text: String,
         val editorMode: MarkedUpTextFileEditorMode
     ) {
-        fun toByteArray() = Json.encodeToString(this).toByteArray()
+        fun toByteArray() = json.encodeToString(this).toByteArray()
 
         companion object {
-            fun fromByteArray(bytes: ByteArray): MarkupTextFileState = Json.decodeFromString(bytes.decodeToString())
+            fun fromByteArray(bytes: ByteArray): MarkupTextFileState = json.decodeFromString(bytes.decodeToString())
         }
     }
 }
@@ -230,7 +231,6 @@ sealed class FileSystemItem : JavaSerializable {
         val name: String,
         @Serializable(with = PersistentListSerializer::class)
         val children: PersistentList<RegularFileSystemItem>,
-        val isCollapsed: Boolean
     ) : RegularFileSystemItem()
 
     @Serializable
@@ -354,13 +354,14 @@ fun FileType.icon() = when (this) {
     is TextFileType.PlainText -> Icon(Icons.AutoMirrored.Filled.TextSnippet, contentDescription = "Plain text")
     is MarkupTextFileType.Markdown -> Icon(vectorResource(Res.drawable.markdown), contentDescription = name)
     is MarkupTextFileType.Html -> Icon(Icons.Default.Html, contentDescription = name)
+    is MarkupTextFileType.Htm -> Icon(Icons.Default.Html, contentDescription = name)
     is TextFileType.SourceCodeFileType -> Icon(Icons.Default.Code, "$extension file")
     is BinaryFileType -> when (extension) {
-        in sourceCodeExtensions -> Icon(Icons.Default.Code, "$extension file")
-        in videoFileExtensions -> Icon(Icons.Default.VideoFile, "$extension file")
-        in audioFileExtensions -> Icon(Icons.Default.AudioFile, "$extension file")
-        in imageFileExtensions -> Icon(Icons.Default.Image, "$extension file")
-        else -> Icon(vectorResource(Res.drawable.unknown_document), "$extension file")
+        in sourceCodeExtensions -> Icon(Icons.Default.Code, "${extension ?: ""} file")
+        in videoFileExtensions -> Icon(Icons.Default.VideoFile, "${extension ?: ""} file")
+        in audioFileExtensions -> Icon(Icons.Default.AudioFile, "${extension ?: ""} file")
+        in imageFileExtensions -> Icon(Icons.Default.Image, "${extension ?: ""} file")
+        else -> Icon(vectorResource(Res.drawable.unknown_document), "${extension ?: ""} file")
     }
 }
 
@@ -373,7 +374,7 @@ class SpaceStructure(
     constructor() : this(FileSystemItem.Root(persistentListOf()), persistentMapOf())
 
     operator fun get(fileId: FileSystemItem.FileId) = files[fileId]
-    private fun toBytes() = Json.encodeToString(this).encodeToByteArray()
+    private fun toBytes() = json.encodeToString(this).encodeToByteArray()
     suspend fun toDecryptedBytes(name: String, privateKey: PrivateKey, provider: CryptoProvider) =
         DecryptedSpaceInfo.fromDecryptedData(
             name = name,
@@ -386,7 +387,7 @@ class SpaceStructure(
         toDecryptedBytes(name, privateKey, provider).toEncryptedSpaceInfo()
 
     companion object {
-        private fun fromBytes(bytes: ByteArray) = Json.decodeFromString<SpaceStructure>(bytes.decodeToString())
+        private fun fromBytes(bytes: ByteArray) = json.decodeFromString<SpaceStructure>(bytes.decodeToString())
         fun fromDecryptedBytes(decryptedSpaceInfo: DecryptedSpaceInfo) = fromBytes(decryptedSpaceInfo.decryptedData)
         suspend fun fromEncryptedBytes(
             cryptoProvider: CryptoProvider,

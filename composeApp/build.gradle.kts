@@ -33,6 +33,7 @@ kotlin {
             implementation(libs.androidx.startup.runtime)
             implementation(libs.kotlin.coroutines.android)
             implementation(libs.android.svg)
+            implementation(libs.androidx.documentfile)
         }
         commonMain.dependencies {
             implementation(compose.runtime)
@@ -57,6 +58,7 @@ kotlin {
             implementation(libs.compose.animate.single.dimension)
             implementation(libs.file.kit)
             implementation(libs.editor.kotlin)
+            implementation(libs.reorderable)
         }
         desktopMain.dependencies {
             nativeJavaFx()

@@ -4,7 +4,6 @@ import android.content.Intent
 import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.drawable.PictureDrawable
-import android.net.Uri
 import android.webkit.MimeTypeMap
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
@@ -63,8 +62,8 @@ actual fun HtmlView(html: String, backgroundColor: androidx.compose.ui.graphics.
 }
 
 actual fun openFileInDefaultApp(file: File) {
-    val mimeType = MimeTypeMap.getSingleton().getMimeTypeFromExtension(file.type.extension) ?: "*/*"
-    val ioFile = Files.createTempFile(appContext.filesDir.toPath(), file.name, ".${file.type.extension}").toFile()
+    val mimeType = MimeTypeMap.getSingleton().getMimeTypeFromExtension(file.type.extension ?: "") ?: "*/*"
+    val ioFile = Files.createTempFile(appContext.filesDir.toPath(), file.name, file.type.extension?.let { ".$it" } ?: "").toFile()
     ioFile.writeBytes(file.makeFileContent())
     val uri = FileProvider.getUriForFile(appContext, "com.zhelenskiy.vault.file-provider", ioFile)
     val intent = Intent(Intent.ACTION_VIEW)

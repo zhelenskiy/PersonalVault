@@ -35,6 +35,8 @@ editor-kotlin = "0.0.13"
 file-kit = "0.7.0"
 android-svg = "1.4"
 junique = "1.0.4"
+reorderable = "2.3.0"
+documentfile = "1.0.1"
 
 [libraries]
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
@@ -81,6 +83,8 @@ editor-kotlin = { module = "com.zhelenskiy:editor-kotlin", version.ref = "editor
 file-kit = { module = "io.github.vinceglb:filekit-compose", version.ref = "file-kit" }
 android-svg = { module = "com.caverock:androidsvg", version.ref = "android-svg" }
 junique = { module = "it.sauronsoftware:junique", version.ref = "junique" }
+reorderable = { module = "sh.calvin.reorderable:reorderable", version.ref = "reorderable" }
+androidx-documentfile = { group = "androidx.documentfile", name = "documentfile", version.ref = "documentfile" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }

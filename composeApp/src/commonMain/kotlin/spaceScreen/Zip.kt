@@ -20,7 +20,7 @@ private suspend fun ZipOutputStream.putRegularFileSystemItem(
 
 @Suppress("BlockingMethodInNonBlockingContext")
 private suspend fun ZipOutputStream.putFile(prefix: String, file: File) {
-    val zipEntry = ZipEntry("$prefix${file.name}.${file.type.extension}")
+    val zipEntry = ZipEntry("$prefix${file.name}${file.type.extension?.let { ".$it" } ?: ""}")
     yield()
     putNextEntry(zipEntry)
     write(file.makeFileContent())

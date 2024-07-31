@@ -20,7 +20,6 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
@@ -30,7 +29,6 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.input.getSelectedText
-import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -113,7 +111,7 @@ fun FileEditorScreenContent(
                         SyncIndicator()
                     }
 
-                    if (file is TextFile || file is BinaryFile && (file.type.extension.lowercase() in openableImageFormats)) {
+                    if (file is TextFile || file is BinaryFile && (file.type.extension?.lowercase() in openableImageFormats)) {
                         IconButton(onClick = { openFileInDefaultApp(file) }) {
                             Icon(Icons.Default.FileOpen, "Open in external application")
                         }
@@ -131,7 +129,7 @@ fun FileEditorScreenContent(
             when (file) {
                 null -> {}
                 is TextFile -> TextFileEditor(file, onFileChanged, snackbarHostState)
-                is BinaryFile -> when (file.type.extension.lowercase()) {
+                is BinaryFile -> when (file.type.extension?.lowercase()) {
                     in openableRasterImageFormats -> {
                         var bitmap by remember { mutableStateOf<ImageBitmap?>(null) }
                         LaunchedEffect(file) {
@@ -229,6 +227,7 @@ fun TextFileEditor(file: TextFile, onFileChanged: (TextFile) -> Unit, snackbarHo
                         textColor = ButtonDefaults.buttonColors().contentColor
                     )
                 ),
+                modifier = Modifier.fillMaxHeight(),
                 sourceEditorFeaturesConfiguration = KotlinSourceEditorFeaturesConfiguration(),
                 snackbarHostState = snackbarHostState,
             )
@@ -266,7 +265,7 @@ private fun MarkedUpTextFileEditor(
     onTextFieldValueChange: (TextFieldValue) -> Unit,
 ) {
     val actions = when (fileType) {
-        MarkupTextFileType.Html -> htmlActions
+        MarkupTextFileType.Html, MarkupTextFileType.Htm -> htmlActions
         MarkupTextFileType.Markdown -> markdownActions
     }
     val mode = editorMode
@@ -479,7 +478,7 @@ private fun MarkedUpTextFileEditor(
                 }
             }
             val html = when (fileType) {
-                MarkupTextFileType.Html -> textFieldValue.text
+                MarkupTextFileType.Html, MarkupTextFileType.Htm -> textFieldValue.text
                 MarkupTextFileType.Markdown -> rememberSaveable(textFieldValue.text) {
                     convertMarkdownToHtml(textFieldValue.text)
                 }

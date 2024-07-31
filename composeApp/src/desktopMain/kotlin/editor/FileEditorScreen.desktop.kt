@@ -22,7 +22,7 @@ actual fun HtmlView(html: String, backgroundColor: Color, modifier: Modifier) {
 
 actual fun openFileInDefaultApp(file: File) {
     if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.OPEN)) {
-        val ioFile = createTempFile(suffix = ".${file.type.extension}").toFile()
+        val ioFile = createTempFile(suffix = file.type.extension?.let { ".$it" } ?: "").toFile()
         ioFile.writeBytes(file.makeFileContent())
         Desktop.getDesktop().open(ioFile)
         ioFile.deleteOnExit()
