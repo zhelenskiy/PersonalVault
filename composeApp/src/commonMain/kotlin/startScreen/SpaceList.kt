@@ -33,12 +33,13 @@ import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import common.*
 import crypto.*
-import kotlinx.collections.immutable.PersistentList
+import kotlinx.collections.immutable.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.yield
 import spaceScreen.SpaceScreen
+import kotlin.random.Random
 
 class SpaceListScreen : Screen {
     @Composable
@@ -103,6 +104,28 @@ fun SpaceListScreenContent(
             )
         }
     ) { paddingValues ->
+        var spacesToIds by remember {
+            mutableStateOf(persistentMapOf<EncryptedSpaceInfo, Long>())
+        }
+        var idsToSpaces by remember {
+            mutableStateOf(persistentMapOf<Long, EncryptedSpaceInfo>())
+        }
+        LaunchedEffect(spaces) {
+            val spacesToDelete = spacesToIds.keys - spaces
+            idsToSpaces = idsToSpaces.mutate {
+                for (spaceToDelete in spacesToDelete) {
+                    it.remove(spacesToIds[spaceToDelete])
+                }
+            }
+            spacesToIds -= spacesToDelete
+        }
+        fun getOrPutId(space: EncryptedSpaceInfo): Long {
+            spacesToIds[space]?.let { return it }
+            val id = generateSequence { Random.nextLong() }.dropWhile { it in spacesToIds.values }.first()
+            spacesToIds = spacesToIds.put(space, id)
+            idsToSpaces = idsToSpaces.put(id, space)
+            return id
+        }
         Box(Modifier.windowInsetsPadding(WindowInsets.ime).padding(paddingValues)) {
             AnimatedVisibility(isFetchingInitialData, enter = fadeIn(), exit = fadeOut()) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -152,6 +175,12 @@ fun SpaceListScreenContent(
                             onDismissRequest = onClose,
                             onPrivateKeyReceived = { onSpaceOpen(index, it) },
                         )
+                    },
+                    key = { getOrPutId(it) },
+                    indexByKey = { spaces.indexOf(idsToSpaces[it]) },
+                    changeOrder = { from, to ->
+                        val element = spaces[from]
+                        onSpacesChange(spaces.removeAt(from).add(to, element))
                     },
                 ) { index, space ->
                     CardTextField(

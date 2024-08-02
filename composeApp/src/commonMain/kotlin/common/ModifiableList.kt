@@ -1,14 +1,13 @@
 package common
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -36,6 +35,9 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyListState
 
 @Composable
 fun ModifiableListItemDecoration(
@@ -76,23 +78,32 @@ fun ModifiableListItemDecoration(
 }
 
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun <T> ModifiableList(
+inline fun <T, reified K : Any> ModifiableList(
     items: List<T>,
-    onEmptyContent: @Composable () -> Unit,
-    onCreateItemRequest: (@Composable (onEnd: () -> Unit) -> Unit)? = null,
-    onChangeItemRequest: (@Composable (index: Int, item: T, onEnd: () -> Unit) -> Unit)? = null,
-    onDeleteItemRequest: (@Composable (index: Int, item: T, onEnd: () -> Unit) -> Unit)? = null,
-    onItemClick: @Composable ((index: Int, item: T, onEnd: () -> Unit) -> Unit)? = null,
-    content: @Composable RowScope.(index: Int, item: T) -> Unit,
+    noinline key: (T) -> K,
+    crossinline indexByKey: (K) -> Int,
+    crossinline changeOrder: (from: Int, to: Int) -> Unit,
+    crossinline onEmptyContent: @Composable () -> Unit,
+    noinline onCreateItemRequest: (@Composable (onEnd: () -> Unit) -> Unit)? = null,
+    noinline onChangeItemRequest: (@Composable (index: Int, item: T, onEnd: () -> Unit) -> Unit)? = null,
+    noinline onDeleteItemRequest: (@Composable (index: Int, item: T, onEnd: () -> Unit) -> Unit)? = null,
+    noinline onItemClick: @Composable ((index: Int, item: T, onEnd: () -> Unit) -> Unit)? = null,
+    modifier: Modifier = Modifier,
+    crossinline content: @Composable RowScope.(index: Int, item: T) -> Unit,
 ) {
     val lazyListState = rememberLazyListState()
-    Box {
+    val reorderableLazyListState = rememberReorderableLazyListState(lazyListState) { from, to ->
+        val fromIndex = indexByKey(from.key as? K ?: return@rememberReorderableLazyListState)
+        val toIndex = indexByKey(to.key as? K ?: return@rememberReorderableLazyListState)
+        changeOrder(fromIndex, toIndex)
+    }
+    val coroutineScope = rememberCoroutineScope()
+    Box(modifier) {
         LazyColumn(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier
-                .padding(10.dp)
-                .fillMaxWidth(),
+            modifier = Modifier.fillMaxSize(),
             state = lazyListState,
         ) {
             item {
@@ -101,30 +112,42 @@ fun <T> ModifiableList(
                 }
             }
 
-            itemsIndexed(items) { index, item ->
-                val shape = MaterialTheme.shapes.large
-                var clickIsActive by rememberSaveable { mutableStateOf(false) }
-                Card(
-                    shape = shape,
-                    modifier = Modifier
-                        .padding(8.dp)
-                        .clip(shape)
-                        .run { if (onItemClick != null) clickable { clickIsActive = true } else this },
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .widthIn(max = 600.dp)
-                            .padding(horizontal = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        content(index, item)
-                        ModifiableListItemDecoration(
-                            onChangeItemRequest = onChangeItemRequest?.let { { onEnd -> onChangeItemRequest(index, item, onEnd) } },
-                            onDeleteItemRequest = onDeleteItemRequest?.let { { onEnd -> onDeleteItemRequest(index, item, onEnd) } },
-                        )
+            itemsIndexed(items, key = { _, item -> key(item) }) { index, item ->
+                ReorderableItem(reorderableLazyListState, key = key(item)) { isDragging ->
+                    val shape = MaterialTheme.shapes.large
+                    var clickIsActive by rememberSaveable { mutableStateOf(false) }
+                    val elevation by animateDpAsState(if (isDragging) 4.dp else 0.dp)
 
-                        if (onItemClick != null && clickIsActive) {
-                            onItemClick(index, item) { clickIsActive = false }
+                    Card(
+                        shape = shape,
+                        modifier = Modifier
+                            .draggableHandle()
+                            .padding(8.dp)
+                            .clip(shape)
+                            .run { if (onItemClick != null) clickable { clickIsActive = true } else this },
+                        elevation = CardDefaults.cardElevation(
+                            elevation, elevation, elevation, elevation, elevation, elevation
+                        ),
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .widthIn(max = 600.dp)
+                                .padding(horizontal = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            content(index, item)
+                            ModifiableListItemDecoration(
+                                onChangeItemRequest = onChangeItemRequest?.let {
+                                    { onEnd -> onChangeItemRequest(index, item, onEnd) }
+                                },
+                                onDeleteItemRequest = onDeleteItemRequest?.let {
+                                    { onEnd -> onDeleteItemRequest(index, item, onEnd) }
+                                },
+                            )
+
+                            if (onItemClick != null && clickIsActive) {
+                                onItemClick(index, item) { clickIsActive = false }
+                            }
                         }
                     }
                 }
@@ -141,7 +164,12 @@ fun <T> ModifiableList(
                         Icon(Icons.Default.Add, "Create")
                     }
                     if (creatingIsActive) {
-                        onCreateItemRequest { creatingIsActive = false }
+                        onCreateItemRequest {
+                            creatingIsActive = false
+                            coroutineScope.launch {
+                                lazyListState.animateScrollToItem(Int.MAX_VALUE)
+                            }
+                        }
                     }
                 }
             }
