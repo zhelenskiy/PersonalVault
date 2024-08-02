@@ -4,6 +4,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.*
 import common.File
 import common.FileSystemItem
+import common.FileSystemItem.FileId
+import common.FileSystemItem.RegularFileSystemItem
 import common.SpaceStructure
 import io.github.vinceglb.filekit.core.PlatformDirectory
 import kotlinx.collections.immutable.PersistentMap
@@ -11,7 +13,7 @@ import java.net.URI
 
 @OptIn(ExperimentalComposeUiApi::class)
 actual fun Modifier.onExternalFiles(
-    mapping: PersistentMap<FileSystemItem.FileId, File>,
+    mapping: PersistentMap<FileId, File?>,
     enabled: Boolean,
     onDraggingChange: (Boolean) -> Unit,
     whenDraging: @Composable Modifier.() -> Modifier,
@@ -32,4 +34,4 @@ actual fun Modifier.onExternalFiles(
     )
 }
 
-actual fun PlatformDirectory.toSpaceStrcuture(mapping: PersistentMap<FileSystemItem.FileId, File>): SpaceStructure = listOf(file).toSpaceStructure(mapping)
+actual fun PlatformDirectory.toSpaceStructure(mapping: PersistentMap<FileId, File?>): SpaceStructure = listOf(file).toSpaceStructure(mapping)

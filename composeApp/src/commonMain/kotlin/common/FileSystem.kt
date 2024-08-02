@@ -6,6 +6,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import cafe.adriel.voyager.core.lifecycle.JavaSerializable
+import common.FileSystemItem.FileId
 import crypto.CryptoProvider
 import crypto.PrivateKey
 import kotlinx.collections.immutable.*
@@ -20,13 +21,17 @@ import org.jetbrains.compose.resources.vectorResource
 import personalvault.composeapp.generated.resources.Res
 import personalvault.composeapp.generated.resources.markdown
 import personalvault.composeapp.generated.resources.unknown_document
+import kotlin.random.Random
 
 @Serializable
 sealed class FileType {
     abstract val extension: String?
 }
 
-private val json = Json { ignoreUnknownKeys = true }
+private val json = Json {
+    ignoreUnknownKeys = true
+    encodeDefaults = true
+}
 
 fun getFileTypeByExtension(extension: String?) = when (extension) {
     "html" -> MarkupTextFileType.Html
@@ -212,32 +217,37 @@ class PlainTextFile private constructor(
     override val type: TextFileType get() = TextFileType.PlainText
 }
 
-private object InlineFileIdSerializer : KSerializer<FileSystemItem.FileId> {
+private object InlineFileIdSerializer : KSerializer<FileId> {
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("FileId", PrimitiveKind.LONG)
-    override fun deserialize(decoder: Decoder): FileSystemItem.FileId = FileSystemItem.FileId(decoder.decodeLong())
-    override fun serialize(encoder: Encoder, value: FileSystemItem.FileId) = encoder.encodeLong(value.id)
+    override fun deserialize(decoder: Decoder): FileId = FileId(decoder.decodeLong())
+    override fun serialize(encoder: Encoder, value: FileId) = encoder.encodeLong(value.id)
 }
 
 @Serializable
 sealed class FileSystemItem : JavaSerializable {
     @Serializable
-    sealed class RegularFileSystemItem : FileSystemItem(), JavaSerializable
+    sealed class RegularFileSystemItem : FileSystemItem(), JavaSerializable {
+        abstract val fileId: FileId
+    }
 
     @Serializable
-    data class FileId(val id: Long) : RegularFileSystemItem(), JavaSerializable
+    data class FileId(val id: Long) : RegularFileSystemItem(), JavaSerializable {
+        override val fileId: FileId get() = this
+    }
 
     @Serializable
     class Directory(
+        override val fileId: FileId,
         val name: String,
         @Serializable(with = PersistentListSerializer::class)
         val children: PersistentList<RegularFileSystemItem>,
-    ) : RegularFileSystemItem()
+    ) : RegularFileSystemItem(), JavaSerializable
 
     @Serializable
     class Root(
         @Serializable(with = PersistentListSerializer::class)
         val children: PersistentList<RegularFileSystemItem>
-    ) : FileSystemItem()
+    ) : FileSystemItem(), JavaSerializable
 }
 
 private val sourceCodeExtensions = setOf(
@@ -369,11 +379,11 @@ fun FileType.icon() = when (this) {
 class SpaceStructure(
     val fileStructure: FileSystemItem.Root,
     @Serializable(with = PersistentMapSerializer::class)
-    val files: PersistentMap<@Serializable(with = InlineFileIdSerializer::class) FileSystemItem.FileId, File>
+    val files: PersistentMap<@Serializable(with = InlineFileIdSerializer::class) FileId, File?>
 ) {
     constructor() : this(FileSystemItem.Root(persistentListOf()), persistentMapOf())
 
-    operator fun get(fileId: FileSystemItem.FileId) = files[fileId]
+    operator fun get(fileId: FileId) = files[fileId]
     private fun toBytes() = json.encodeToString(this).encodeToByteArray()
     suspend fun toDecryptedBytes(name: String, privateKey: PrivateKey, provider: CryptoProvider) =
         DecryptedSpaceInfo.fromDecryptedData(

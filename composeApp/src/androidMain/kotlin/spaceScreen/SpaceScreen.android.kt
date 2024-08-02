@@ -5,6 +5,8 @@ import androidx.compose.ui.Modifier
 import androidx.documentfile.provider.DocumentFile
 import common.File
 import common.FileSystemItem
+import common.FileSystemItem.FileId
+import common.FileSystemItem.RegularFileSystemItem
 import common.SpaceStructure
 import io.github.vinceglb.filekit.core.PlatformDirectory
 import kotlinx.collections.immutable.PersistentMap
@@ -12,21 +14,23 @@ import kotlinx.collections.immutable.toPersistentList
 import repositories.appContext
 
 actual fun Modifier.onExternalFiles(
-    mapping: PersistentMap<FileSystemItem.FileId, File>,
+    mapping: PersistentMap<FileId, File?>,
     enabled: Boolean,
     onDraggingChange: (Boolean) -> Unit,
     whenDraging: @Composable Modifier.() -> Modifier,
     onSpace: (SpaceStructure) -> Unit
 ): Modifier = this
 
-actual fun PlatformDirectory.toSpaceStrcuture(mapping: PersistentMap<FileSystemItem.FileId, File>): SpaceStructure {
+actual fun PlatformDirectory.toSpaceStructure(mapping: PersistentMap<FileId, File?>): SpaceStructure {
     @Suppress("NAME_SHADOWING")
     var mapping = mapping
-    fun impl(file: DocumentFile): FileSystemItem.RegularFileSystemItem? {
+    fun impl(file: DocumentFile): RegularFileSystemItem? {
         return when {
             file.isDirectory -> {
                 val inner = file.listFiles().mapNotNull(::impl).toPersistentList()
-                FileSystemItem.Directory(file.name ?: "", inner)
+                val id = generateFileId(mapping)
+                mapping = mapping.put(id, null)
+                FileSystemItem.Directory(id, file.name ?: "", inner)
             }
 
             file.isFile -> {

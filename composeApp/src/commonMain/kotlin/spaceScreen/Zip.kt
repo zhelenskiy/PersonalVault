@@ -2,6 +2,7 @@ package spaceScreen
 
 import common.File
 import common.FileSystemItem
+import common.FileSystemItem.FileId
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.yield
@@ -10,12 +11,12 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
 private suspend fun ZipOutputStream.putRegularFileSystemItem(
-    files: Map<FileSystemItem.FileId, File>,
+    files: Map<FileId, File?>,
     prefix: String,
     item: FileSystemItem.RegularFileSystemItem
 ) = when (item) {
     is FileSystemItem.Directory -> putDirectory(files, prefix, item)
-    is FileSystemItem.FileId -> files[item]?.let { putFile(prefix, it) }
+    is FileId -> files[item]?.let { putFile(prefix, it) }
 }
 
 @Suppress("BlockingMethodInNonBlockingContext")
@@ -29,7 +30,7 @@ private suspend fun ZipOutputStream.putFile(prefix: String, file: File) {
 
 @Suppress("BlockingMethodInNonBlockingContext")
 private suspend fun ZipOutputStream.putDirectory(
-    files: Map<FileSystemItem.FileId, File>,
+    files: Map<FileId, File?>,
     prefix: String,
     directory: FileSystemItem.Directory
 ) {
@@ -45,7 +46,7 @@ private suspend fun ZipOutputStream.putDirectory(
     }
 }
 
-suspend fun FileSystemItem.Directory.toZipArchive(files: Map<FileSystemItem.FileId, File>): ByteArray =
+suspend fun FileSystemItem.Directory.toZipArchive(files: Map<FileId, File?>): ByteArray =
     withContext(Dispatchers.IO) {
         val byteArrayOutputStream = ByteArrayOutputStream()
         ZipOutputStream(byteArrayOutputStream).use {
@@ -54,7 +55,7 @@ suspend fun FileSystemItem.Directory.toZipArchive(files: Map<FileSystemItem.File
         byteArrayOutputStream.toByteArray()
     }
 
-suspend fun FileSystemItem.Root.toZipArchive(files: Map<FileSystemItem.FileId, File>): ByteArray =
+suspend fun FileSystemItem.Root.toZipArchive(files: Map<FileId, File?>): ByteArray =
     withContext(Dispatchers.IO) {
         val byteArrayOutputStream = ByteArrayOutputStream()
         ZipOutputStream(byteArrayOutputStream).use {
