@@ -288,7 +288,7 @@ fun RowScope.CardTextField(
     val singleLine = true
     Box(modifier.weight(1f).padding(start = 8.dp)) {
         val textMeasurer = rememberTextMeasurer()
-        var width by remember { mutableStateOf(0) }
+        var width by remember { mutableStateOf<Int?>(null) }
         val textStyle = MaterialTheme.typography.titleMedium
         val density = LocalDensity.current
         val emptyText = "Untitled"
@@ -299,7 +299,7 @@ fun RowScope.CardTextField(
             value = value,
             onValueChange = onValueChange,
             modifier = Modifier
-                .width(density.run { width.toDp() + 4.dp })
+                .width(density.run { (width ?: return).toDp() + 4.dp })
                 .onKeyEvent {
                     if (!it.isAltPressed && !it.isCtrlPressed && !it.isShiftPressed && !it.isMetaPressed && it.key == Key.Escape && it.type == KeyEventType.KeyDown) {
                         keyboardController?.hide()
