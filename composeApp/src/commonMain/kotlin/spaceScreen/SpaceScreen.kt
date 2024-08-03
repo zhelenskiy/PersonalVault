@@ -10,7 +10,6 @@ import androidx.compose.foundation.text.BasicText
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.rounded.DragHandle
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -1068,8 +1067,6 @@ private fun DirectoryLikeSaver(
 @Composable
 private fun DirectoryOpener(
     snackbarHostState: SnackbarHostState,
-    modifier: Modifier = Modifier,
-    enabled: Boolean,
     mapping: PersistentMap<FileId, File?>,
     onDirectoryOpen: (SpaceStructure) -> Unit,
     content: @Composable (launchPicker: () -> Unit) -> Unit,
@@ -1192,7 +1189,6 @@ private fun OpenFileSystemItemButton(
         ) {
             DirectoryOpener(
                 snackbarHostState = snackbarHostState,
-                enabled = enabled,
                 mapping = files,
                 onDirectoryOpen = {
                     onFileSystemItems(it.fileStructure.children, it.files)
@@ -1231,33 +1227,6 @@ private fun OpenFileSystemItemButton(
             }
         }
     }
-//    FileOpener(
-//        snackbarHostState = snackbarHostState,
-//        onFilesOpen = { newFiles ->
-//            var newMapping = files
-//            val fileIds = mutableListOf<FileId>()
-//            for (file in newFiles) {
-//                val id = generateFileId(newMapping)
-//                newMapping = newMapping.put(id, file)
-//                fileIds.add(id)
-//            }
-//            changeRootByChangesInsideCurrentFolder(newMapping) {
-//                addAll(fileIds)
-//            }
-//            onOpened()
-//        },
-//    ) { launch ->
-//        IconButton(modifier = modifier, enabled = enabled, onClick = { launch() }) {
-//            Icon(Icons.Default.UploadFile, "Upload files")
-//        }
-//    }
-//
-//    DirectoryOpener(snackbarHostState, enabled = enabled, mapping = files, onDirectoryOpen = {
-//        changeRootByChangesInsideCurrentFolder(it.files) {
-//            addAll(it.fileStructure.children)
-//        }
-//        onOpened()
-//    })
 }
 
 @Composable
