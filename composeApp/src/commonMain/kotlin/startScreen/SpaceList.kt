@@ -33,11 +33,16 @@ import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import common.*
 import crypto.*
+import io.github.vinceglb.filekit.compose.rememberFilePickerLauncher
+import io.github.vinceglb.filekit.compose.rememberFileSaverLauncher
+import io.github.vinceglb.filekit.core.PickerType
 import kotlinx.collections.immutable.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.yield
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import spaceScreen.SpaceScreen
 import kotlin.random.Random
 
@@ -73,6 +78,8 @@ fun SpaceListScreenContent(
     isSaving: Boolean,
     isFetchingInitialData: Boolean,
 ) {
+    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
@@ -88,9 +95,23 @@ fun SpaceListScreenContent(
                         SyncIndicator()
                     }
 
+                    AnimatedVisibility(spaces.isNotEmpty()) {
+                        var show by remember { mutableStateOf(false) }
+                        IconButton(onClick = { show = !show }) {
+                            Icon(Icons.Default.Download, "Export all")
+                        }
+                        if (show) {
+                            SpacesExport(
+                                spaces = spaces,
+                                reportMessage = { coroutineScope.launch { snackbarHostState.showSnackbar(it) } },
+                                onDone = { show = false },
+                            )
+                        }
+                    }
+
                     var showDeleteAllDialog by rememberSaveable { mutableStateOf(false) }
                     IconButton(onClick = { showDeleteAllDialog = true }) {
-                        Icon(Icons.Default.Delete, "Delete all")
+                        Icon(Icons.Default.DeleteSweep, "Delete all")
                     }
                     if (showDeleteAllDialog) {
                         DeletionConfirmation(
@@ -102,7 +123,8 @@ fun SpaceListScreenContent(
                     }
                 },
             )
-        }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { paddingValues ->
         var spacesToIds by remember {
             mutableStateOf(persistentMapOf<EncryptedSpaceInfo, Long>())
@@ -176,6 +198,26 @@ fun SpaceListScreenContent(
                             onPrivateKeyReceived = { onSpaceOpen(index, it) },
                         )
                     },
+                    onItemExport = { _, space, onEnd ->
+                        SpacesExport(
+                            spaces = listOf(space),
+                            reportMessage = { coroutineScope.launch { snackbarHostState.showSnackbar(it) } },
+                            onDone = onEnd,
+                        )
+                    },
+                    onItemsUpload = { onEnd ->
+                        SpacesImport(
+                            reportMessage = { coroutineScope.launch { snackbarHostState.showSnackbar(it) } },
+                            onSpaces = { files ->
+                                if (files.isNullOrEmpty()) {
+                                    onEnd(false)
+                                } else {
+                                    onSpacesChange(spaces.addAll(files))
+                                    onEnd(true)
+                                }
+                            }
+                        )
+                    },
                     key = { getOrPutId(it) },
                     indexByKey = { spaces.indexOf(idsToSpaces[it]) },
                     changeOrder = { from, to ->
@@ -184,15 +226,12 @@ fun SpaceListScreenContent(
                     },
                 ) { index, space ->
                     CardTextField(
-                        space.name,
+                        value = space.name,
                         onValueChange = {
-                            onSpacesChange(
-                                spaces.set(
-                                    index = index,
-                                    element = EncryptedSpaceInfo(it, space.publicKey, space.encryptedData)
-                                )
-                            )
-                        })
+                            val encryptedSpaceInfo = EncryptedSpaceInfo(it, space.publicKey, space.encryptedData)
+                            onSpacesChange(spaces.set(index = index, element = encryptedSpaceInfo))
+                        }
+                    )
                 }
             }
         }
@@ -201,16 +240,72 @@ fun SpaceListScreenContent(
 
 const val minPasswordLength = 6
 
+private val json = Json {
+    ignoreUnknownKeys = true
+    encodeDefaults = true
+}
+
+@Composable
+fun SpacesExport(spaces: List<EncryptedSpaceInfo>, reportMessage: (String) -> Unit, onDone: () -> Unit) {
+    if (spaces.isEmpty()) {
+        reportMessage("Nothing to export")
+        onDone()
+        return
+    }
+    val saveFilePicker = rememberFileSaverLauncher { file ->
+        if (file != null) {
+            reportMessage("Exported successfully")
+        }
+        onDone()
+    }
+    LaunchedEffect(Unit) {
+        saveFilePicker.launch(
+            bytes = json.encodeToString(spaces).encodeToByteArray(),
+            baseName = if (spaces.size == 1) spaces.single().name else "",
+            extension = "json",
+        )
+    }
+}
+
+@Composable
+fun SpacesImport(reportMessage: (String) -> Unit, onSpaces: (List<EncryptedSpaceInfo>?) -> Unit) {
+    val coroutineScope = rememberCoroutineScope()
+    val filePicker = rememberFilePickerLauncher(
+        type = PickerType.File(listOf("json")),
+        title = "Export spaces",
+    ) { file ->
+        if (file == null) {
+            onSpaces(null)
+            return@rememberFilePickerLauncher
+        }
+        coroutineScope.launch {
+            val spaces = try {
+                json.decodeFromString<List<EncryptedSpaceInfo>>(file.readBytes().decodeToString())
+            } catch (e: Throwable) {
+                reportMessage(e.message ?: "An error occurred")
+                onSpaces(null)
+                return@launch
+            }
+            onSpaces(spaces)
+            reportMessage("Imported ${spaces.size} space${if (spaces.size == 1) "" else "s"} successfully")
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        filePicker.launch()
+    }
+}
+
 @Composable
 fun NewSpaceDialog(
     cryptoProvider: CryptoProvider,
-    onDismissRequest: () -> Unit,
+    onDismissRequest: (Boolean) -> Unit,
     addSpace: (EncryptedSpaceInfo) -> Unit
 ) {
     NativeDialog(
         title = "New space",
         size = DpSize(400.dp, 250.dp),
-        onDismissRequest = onDismissRequest,
+        onDismissRequest = { onDismissRequest(false) },
     ) {
         var name by rememberSaveable { mutableStateOf("") }
         var password by rememberSaveable { mutableStateOf("") }
@@ -278,7 +373,7 @@ fun NewSpaceDialog(
                 val coroutineScope = rememberCoroutineScope()
                 DialogButtons(
                     enableClickingSuccessButton = isCorrect && !isLoading,
-                    onDismissRequest = onDismissRequest,
+                    onDismissRequest = { onDismissRequest(false) },
                     onSuccess = {
                         coroutineScope.launch {
                             try {
@@ -295,7 +390,7 @@ fun NewSpaceDialog(
                             } finally {
                                 isLoading = false
                             }
-                            onDismissRequest()
+                            onDismissRequest(true)
                         }
                     },
                     focusRequester = okFocusRequester,

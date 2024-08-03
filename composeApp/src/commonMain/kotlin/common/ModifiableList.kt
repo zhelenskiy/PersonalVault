@@ -86,10 +86,12 @@ inline fun <T, reified K : Any> ModifiableList(
     crossinline indexByKey: (K) -> Int,
     crossinline changeOrder: (from: Int, to: Int) -> Unit,
     crossinline onEmptyContent: @Composable () -> Unit,
-    noinline onCreateItemRequest: (@Composable (onEnd: () -> Unit) -> Unit)? = null,
+    noinline onCreateItemRequest: (@Composable (onEnd: (Boolean) -> Unit) -> Unit)? = null,
     noinline onChangeItemRequest: (@Composable (index: Int, item: T, onEnd: () -> Unit) -> Unit)? = null,
     noinline onDeleteItemRequest: (@Composable (index: Int, item: T, onEnd: () -> Unit) -> Unit)? = null,
     noinline onItemClick: @Composable ((index: Int, item: T, onEnd: () -> Unit) -> Unit)? = null,
+    noinline onItemExport: (@Composable (index: Int, item: T, onEnd: () -> Unit) -> Unit)? = null,
+    noinline onItemsUpload: (@Composable ((Boolean) -> Unit) -> Unit)? = null,
     modifier: Modifier = Modifier,
     crossinline content: @Composable RowScope.(index: Int, item: T) -> Unit,
 ) {
@@ -136,6 +138,17 @@ inline fun <T, reified K : Any> ModifiableList(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             content(index, item)
+
+                            if (onItemExport != null) {
+                                var exportIsActive by rememberSaveable { mutableStateOf(false) }
+                                IconButton(onClick = { exportIsActive = !exportIsActive }) {
+                                    Icon(Icons.Default.Download, "Export")
+                                }
+                                if (exportIsActive) {
+                                    onItemExport(index, item) { exportIsActive = false }
+                                }
+                            }
+
                             ModifiableListItemDecoration(
                                 onChangeItemRequest = onChangeItemRequest?.let {
                                     { onEnd -> onChangeItemRequest(index, item, onEnd) }
@@ -153,21 +166,47 @@ inline fun <T, reified K : Any> ModifiableList(
                 }
             }
 
-            if (onCreateItemRequest != null) {
+            if (onCreateItemRequest != null || onItemsUpload != null) {
                 item {
                     Spacer(modifier = Modifier.height(8.dp))
                 }
 
                 item {
-                    var creatingIsActive by rememberSaveable { mutableStateOf(false) }
-                    IconButton(onClick = { creatingIsActive = true }) {
-                        Icon(Icons.Default.Add, "Create")
-                    }
-                    if (creatingIsActive) {
-                        onCreateItemRequest {
-                            creatingIsActive = false
-                            coroutineScope.launch {
-                                lazyListState.animateScrollToItem(Int.MAX_VALUE)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        modifier = Modifier.widthIn(max = 600.dp).fillMaxWidth(),
+                    ) {
+                        if (onCreateItemRequest != null) {
+                            var creatingIsActive by rememberSaveable { mutableStateOf(false) }
+                            IconButton(onClick = { creatingIsActive = !creatingIsActive }) {
+                                Icon(Icons.Default.Add, "Create")
+                            }
+                            if (creatingIsActive) {
+                                onCreateItemRequest { success ->
+                                    creatingIsActive = false
+                                    if (success) {
+                                        coroutineScope.launch {
+                                            lazyListState.animateScrollToItem(Int.MAX_VALUE)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        if (onItemsUpload != null) {
+                            var uploadingIsActive by rememberSaveable { mutableStateOf(false) }
+                            IconButton(onClick = { uploadingIsActive = !uploadingIsActive }) {
+                                Icon(Icons.Default.Upload, "Import")
+                            }
+                            if (uploadingIsActive) {
+                                onItemsUpload { success ->
+                                    uploadingIsActive = false
+                                    if (success) {
+                                        coroutineScope.launch {
+                                            lazyListState.animateScrollToItem(Int.MAX_VALUE)
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
