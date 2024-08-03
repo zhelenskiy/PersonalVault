@@ -6,6 +6,7 @@ import androidx.compose.foundation.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.BasicTextField
@@ -92,10 +93,10 @@ inline fun <T, reified K : Any> ModifiableList(
     noinline onItemClick: @Composable ((index: Int, item: T, onEnd: () -> Unit) -> Unit)? = null,
     noinline onItemExport: (@Composable (index: Int, item: T, onEnd: () -> Unit) -> Unit)? = null,
     noinline onItemsUpload: (@Composable ((Boolean) -> Unit) -> Unit)? = null,
+    lazyListState: LazyListState = rememberLazyListState(),
     modifier: Modifier = Modifier,
     crossinline content: @Composable RowScope.(index: Int, item: T) -> Unit,
 ) {
-    val lazyListState = rememberLazyListState()
     val reorderableLazyListState = rememberReorderableLazyListState(lazyListState) { from, to ->
         val fromIndex = indexByKey(from.key as? K ?: return@rememberReorderableLazyListState)
         val toIndex = indexByKey(to.key as? K ?: return@rememberReorderableLazyListState)

@@ -5,6 +5,8 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -161,6 +163,7 @@ fun SpaceListScreenContent(
                     CircularProgressIndicator()
                 }
             }
+            val lazyListState: LazyListState = rememberLazyListState()
             AnimatedVisibility(!isFetchingInitialData, enter = fadeIn(), exit = fadeOut()) {
                 ModifiableList(
                     items = spaces,
@@ -224,6 +227,20 @@ fun SpaceListScreenContent(
                         val element = spaces[from]
                         onSpacesChange(spaces.removeAt(from).add(to, element))
                     },
+                    lazyListState = lazyListState,
+                    modifier = Modifier.onExternalSpaces(
+                        whenDraging = { border(2.dp, Color.Blue) },
+                    ) { newSpaces ->
+                        if (newSpaces.isNotEmpty()) {
+                            onSpacesChange(spaces.addAll(newSpaces))
+                            coroutineScope.launch {
+                                launch {
+                                    lazyListState.animateScrollToItem(Int.MAX_VALUE)
+                                }
+                                snackbarHostState.showSnackbar("Imported ${newSpaces.size} space${if (newSpaces.size == 1) "" else "s"} successfully")
+                            }
+                        }
+                    },
                 ) { index, space ->
                     CardTextField(
                         value = space.name,
@@ -240,7 +257,7 @@ fun SpaceListScreenContent(
 
 const val minPasswordLength = 6
 
-private val json = Json {
+internal val fileJson = Json {
     ignoreUnknownKeys = true
     encodeDefaults = true
 }
@@ -260,7 +277,7 @@ fun SpacesExport(spaces: List<EncryptedSpaceInfo>, reportMessage: (String) -> Un
     }
     LaunchedEffect(Unit) {
         saveFilePicker.launch(
-            bytes = json.encodeToString(spaces).encodeToByteArray(),
+            bytes = fileJson.encodeToString(spaces).encodeToByteArray(),
             baseName = if (spaces.size == 1) spaces.single().name else "",
             extension = "json",
         )
@@ -280,7 +297,7 @@ fun SpacesImport(reportMessage: (String) -> Unit, onSpaces: (List<EncryptedSpace
         }
         coroutineScope.launch {
             val spaces = try {
-                json.decodeFromString<List<EncryptedSpaceInfo>>(file.readBytes().decodeToString())
+                fileJson.decodeFromString<List<EncryptedSpaceInfo>>(file.readBytes().decodeToString())
             } catch (e: Throwable) {
                 reportMessage(e.message ?: "An error occurred")
                 onSpaces(null)
@@ -295,6 +312,13 @@ fun SpacesImport(reportMessage: (String) -> Unit, onSpaces: (List<EncryptedSpace
         filePicker.launch()
     }
 }
+
+expect fun Modifier.onExternalSpaces(
+    enabled: Boolean = true,
+    onDraggingChange: (Boolean) -> Unit = { },
+    whenDraging: @Composable Modifier.() -> Modifier = { this },
+    onSpace: (List<EncryptedSpaceInfo>) -> Unit,
+): Modifier
 
 @Composable
 fun NewSpaceDialog(
