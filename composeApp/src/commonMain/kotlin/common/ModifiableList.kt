@@ -20,8 +20,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.*
@@ -34,7 +32,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import sh.calvin.reorderable.ReorderableItem
@@ -225,53 +222,29 @@ fun DeletionConfirmation(
     delete: () -> Unit,
     closeDialog: () -> Unit,
 ) {
-    NativeDialog(windowTitle, size = DpSize(400.dp, 120.dp), onDismissRequest = closeDialog) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+    AlertDialog(
+        title = { Text(windowTitle) },
+        onDismissRequest = closeDialog,
+        text = {
             Text(
                 text = text,
                 modifier = Modifier.horizontalScroll(rememberScrollState()).padding(8.dp),
                 textAlign = TextAlign.Center,
             )
-            DialogButtons(
-                enableClickingSuccessButton = true,
-                onDismissRequest = closeDialog,
-                onSuccess = { delete(); closeDialog() },
-            )
+        },
+        confirmButton = {
+            Button(onClick = { delete(); closeDialog() }) {
+                Text("Confirm")
+            }
+        },
+        dismissButton = {
+            Button(onClick = closeDialog) {
+                Text("Cancel")
+            }
         }
-    }
+    )
 }
 
-
-@Composable
-fun DialogButtons(
-    enableClickingSuccessButton: Boolean,
-    onDismissRequest: () -> Unit,
-    onSuccess: () -> Unit,
-    focusRequester: FocusRequester = remember { FocusRequester() },
-    acceptButtonColor: Color = LocalContentColor.current,
-) {
-    Row(
-        horizontalArrangement = Arrangement.SpaceEvenly,
-        modifier = Modifier
-            .fillMaxWidth(),
-    ) {
-        IconButton(
-            onClick = {
-                if (enableClickingSuccessButton) {
-                    onSuccess()
-                }
-            },
-            enabled = enableClickingSuccessButton,
-            modifier = Modifier.focusRequester(focusRequester),
-        ) {
-            Icon(Icons.Default.Done, tint = acceptButtonColor, contentDescription = "Finish creating")
-        }
-
-        IconButton(onClick = onDismissRequest) {
-            Icon(Icons.Default.Close, "Cancel")
-        }
-    }
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
