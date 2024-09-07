@@ -27,10 +27,12 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.input.getSelectedText
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.kodein.rememberScreenModel
@@ -143,6 +145,7 @@ fun FileEditorScreenContent(
                         }
                         bitmap?.let { Image(it, null, modifier = Modifier.fillMaxSize()) } ?: FallbackFileView(file)
                     }
+
                     "svg" -> SvgImage(file.makeFileContent(), Modifier.fillMaxSize())
 
                     else -> FallbackFileView(file)
@@ -241,17 +244,36 @@ fun TextFileEditor(file: TextFile, onFileChanged: (TextFile) -> Unit, snackbarHo
 private fun PlainTextFileEditor(
     textFieldValue: TextFieldValue,
     fontFamily: FontFamily,
+    fontSize: TextUnit = MaterialTheme.typography.bodyLarge.fontSize,
     onTextFieldValueChange: (TextFieldValue) -> Unit
 ) {
+    val textStyle = TextStyle.Default.copy(fontFamily = fontFamily, fontSize = fontSize)
     BasicTextField(
         value = textFieldValue,
         onValueChange = onTextFieldValueChange,
-        textStyle = TextStyle.Default.copy(fontFamily = fontFamily),
-        modifier = Modifier
-            .padding(8.dp)
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(16.dp))
-            .padding(16.dp),
+        textStyle = textStyle,
+        decorationBox = { innerTextField ->
+            Box(
+                modifier = Modifier
+                    .padding(16.dp)
+                    .fillMaxSize(),
+            ) {
+                AnimatedVisibility(
+                    visible = textFieldValue.text.isEmpty(),
+                    enter = fadeIn(),
+                    exit = ExitTransition.None,
+                ) {
+                    Text(
+                        text = "Enter text here",
+                        style = textStyle,
+                        color = textStyle.color.copy(alpha = 0.5f),
+                        fontFamily = FontFamily.SansSerif,
+                        fontSize = fontSize,
+                    )
+                }
+                innerTextField()
+            }
+        }
     )
 }
 
@@ -474,7 +496,11 @@ private fun MarkedUpTextFileEditor(
                 modifier = Modifier.width(firstWidth).align(Alignment.CenterStart),
             ) {
                 androidx.compose.animation.AnimatedVisibility(firstWidth != 0.dp, enter = fadeIn(), exit = fadeOut()) {
-                    PlainTextFileEditor(textFieldValue, FontFamily.Monospace, onTextFieldValueChange)
+                    PlainTextFileEditor(
+                        textFieldValue = textFieldValue,
+                        fontFamily = FontFamily.Monospace,
+                        onTextFieldValueChange = onTextFieldValueChange
+                    )
                 }
             }
             val html = when (fileType) {
@@ -484,18 +510,23 @@ private fun MarkedUpTextFileEditor(
                 }
             }
 
+            if (mode == MarkedUpTextFileEditorMode.Both) {
+                Spacer(
+                    modifier = Modifier
+                        .offset(x = firstWidth)
+                        .padding(vertical = 16.dp)
+                        .background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.3f))
+                        .width(0.5.dp)
+                        .fillMaxHeight(),
+                    )
+            }
 
             Box(
                 modifier = Modifier.width(secondWidth).align(Alignment.CenterEnd)
             ) {
                 androidx.compose.animation.AnimatedVisibility(secondWidth != 0.dp, enter = fadeIn(), exit = fadeOut()) {
-                    val backgroundColor = MaterialTheme.colorScheme.primaryContainer
-                    Box(
-                        Modifier
-                            .padding(8.dp)
-                            .background(backgroundColor, RoundedCornerShape(16.dp))
-                            .padding(16.dp)
-                    ) {
+                    val backgroundColor = MaterialTheme.colorScheme.background
+                    Box(Modifier.padding(16.dp)) {
                         HtmlView(
                             html = html,
                             backgroundColor = backgroundColor,
@@ -562,7 +593,18 @@ private fun RowScope.CopyHtmlIconButton(
 private fun convertMarkdownToHtml(markdown: String): String {
     val flavour = GFMFlavourDescriptor()
     val parsedTree = MarkdownParser(flavour).buildMarkdownTreeFromString(markdown)
-    return HtmlGenerator(markdown, parsedTree, flavour).generateHtml()
+    val head = """
+        <head>
+        <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+        <style>
+            /* Set Roboto as the default font for the whole document */
+            body {
+                font-family: 'Roboto', sans-serif;
+            }
+        </style>
+        </head>
+    """.trimIndent()
+    return head + HtmlGenerator(markdown, parsedTree, flavour).generateHtml()
 }
 
 @Composable

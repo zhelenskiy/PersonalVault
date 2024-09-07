@@ -4,6 +4,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.awt.ComposeWindow
 import androidx.compose.ui.awt.SwingPanel
+import androidx.compose.ui.graphics.Color
 import com.sun.javafx.application.PlatformImpl
 import javafx.application.Platform
 import javafx.concurrent.Worker
@@ -19,6 +20,7 @@ import org.w3c.dom.events.EventTarget
 import org.w3c.dom.html.HTMLAnchorElement
 import java.awt.Desktop
 import java.net.URI
+import javax.swing.UIManager
 
 val LocalWindow = compositionLocalOf<ComposeWindow> { error("No active user found!") }
 
@@ -63,9 +65,12 @@ private const val scrollbarCss = """
 }
 """
 
+
+private val swingPanelColor = UIManager.getColor("Panel.background").let { Color(it.red, it.green, it.blue, it.alpha) }.also(::println)
+
 private fun androidx.compose.ui.graphics.Color.asWebViewBackgroundColor(): String = """
 body {
-  background-color: rgb(${red * 256}, ${green * 256}, ${blue * 256});
+  background-color: rgb(${256 * (red * alpha + swingPanelColor.red * swingPanelColor.alpha * (1 - alpha))}, ${256 * (green * alpha + swingPanelColor.green * swingPanelColor.alpha * (1 - alpha))}, ${256 * (blue * alpha + swingPanelColor.blue * swingPanelColor.alpha * (1 - alpha))});
 }
 """
 
