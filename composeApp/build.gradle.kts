@@ -161,17 +161,22 @@ compose.desktop {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
 
             packageName = "Secure vault"
+            description = "Secure Vault Desktop App"
             packageVersion = "1.0.0"
+            vendor = "Zhelenskiy"
             includeAllModules = true
+            licenseFile = project.file("LICENSE.txt")
 
             macOS {
                 iconFile.set(project.file("icon.icns"))
             }
             windows {
                 iconFile.set(project.file("icon.ico"))
+                menu = true
             }
             linux {
                 iconFile.set(project.file("icon.png"))
+                menuGroup = "Tools;"
             }
         }
     }
