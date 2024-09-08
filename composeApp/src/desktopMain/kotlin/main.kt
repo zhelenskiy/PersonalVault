@@ -1,6 +1,14 @@
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextAlign.Companion
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
@@ -42,11 +50,16 @@ fun main() {
         }
         Window(
             onCloseRequest = { exitApplication(); fxEventLoopReactivizer.finish() },
-            title = "PersonalVault",
+            title = "Personal Vault",
             icon = painterResource(Res.drawable.encrypted),
             state = rememberWindowState(width = 900.dp, height = 675.dp)
         ) {
             LaunchedEffect(Unit) {
+                if (isMac) {
+                    window.rootPane.putClientProperty("apple.awt.fullWindowContent", true)
+                    window.rootPane.putClientProperty("apple.awt.transparentTitleBar", true)
+                    window.rootPane.putClientProperty("apple.awt.windowTitleVisible", false)
+                }
                 appearFlow.collect {
                     SwingUtilities.invokeLater {
                         window.isVisible = true
@@ -58,7 +71,19 @@ fun main() {
                 }
             }
             CompositionLocalProvider(LocalWindow provides window) {
-                App()
+                App {
+                    if (isMac) {
+                        Box {
+                            Text(
+                                text = window.title,
+                                modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background),
+                                textAlign = TextAlign.Center,
+                                color = MaterialTheme.colorScheme.onBackground,
+                                fontWeight = FontWeight.Bold,
+                            )
+                        }
+                    }
+                }
             }
         }
         LaunchedEffect(Unit) {
@@ -68,3 +93,5 @@ fun main() {
         }
     }
 }
+
+val isMac = System.getProperty("os.name") == "Mac OS X"

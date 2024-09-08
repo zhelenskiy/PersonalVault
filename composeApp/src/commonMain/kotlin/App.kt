@@ -1,9 +1,17 @@
+import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.navigator.Navigator
 import cafe.adriel.voyager.transitions.SlideTransition
 import crypto.*
@@ -53,10 +61,13 @@ private val colorScheme: ColorScheme
     }
 
 @Composable
-fun App() = withDI(rootDI) {
+fun App(title: @Composable () -> Unit = {}) = withDI(rootDI) {
     MaterialTheme(colorScheme = colorScheme) {
-        Navigator(SpaceListScreen()) { navigator ->
-            SlideTransition(navigator)
+        Column {
+            title()
+            Navigator(SpaceListScreen()) { navigator ->
+                SlideTransition(navigator)
+            }
         }
     }
 
