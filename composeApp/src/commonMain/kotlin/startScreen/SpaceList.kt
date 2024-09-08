@@ -124,6 +124,8 @@ fun SpaceListScreenContent(
                             closeDialog = { showDeleteAllDialog = false },
                         )
                     }
+                    
+                    ColorSchemeConfigurationButton()
                 },
             )
         },

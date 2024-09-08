@@ -16,7 +16,7 @@ private const val firstCounterValue = Long.MIN_VALUE
 
 class FileSpacesRepository : SpacesRepository {
     private val kStore: KStore<Versioned<List<EncryptedSpaceInfo>>> =
-        storeOf(file = pathTo("spaces.json").toPath().also { it.parent?.toNioPath()?.createDirectories() }.also { println("Data: $it") })
+        storeOf(file = pathTo("spaces.json").toPath().withCreatedParents().also { println("Data: $it") })
 
     private val spacesSavingScope: CoroutineScope = CoroutineScope(EmptyCoroutineContext)
 
@@ -82,5 +82,3 @@ class FileSpacesRepository : SpacesRepository {
         }
     }
 }
-
-expect fun pathTo(vararg ids: String): String

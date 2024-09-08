@@ -66,7 +66,7 @@ private const val scrollbarCss = """
 """
 
 
-private val swingPanelColor = UIManager.getColor("Panel.background").let { Color(it.red, it.green, it.blue, it.alpha) }.also(::println)
+private val swingPanelColor = UIManager.getColor("Panel.background").let { Color(it.red, it.green, it.blue, it.alpha) }
 
 private fun androidx.compose.ui.graphics.Color.asWebViewBackgroundColor(): String = """
 body {

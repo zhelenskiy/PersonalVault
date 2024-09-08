@@ -22,12 +22,13 @@ import common.File
 import repositories.appContext
 import java.io.ByteArrayInputStream
 import java.nio.file.Files
+import androidx.compose.ui.graphics.Color as ComposeColor
 
 
 private data class ScrollPosition(val x: Float, val y: Float)
 
 @Composable
-actual fun HtmlView(html: String, backgroundColor: androidx.compose.ui.graphics.Color, modifier: Modifier) {
+actual fun HtmlView(html: String, backgroundColor: ComposeColor, modifier: Modifier) {
     var scrollPosition by remember { mutableStateOf(ScrollPosition(0f, 0f)) }
     AndroidView(
         factory = { context ->

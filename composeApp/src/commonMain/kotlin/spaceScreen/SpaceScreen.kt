@@ -100,6 +100,8 @@ fun SpaceScreenContent(
                     if (isSaving) {
                         SyncIndicator()
                     }
+
+                    ColorSchemeConfigurationButton()
                 },
             )
         },
@@ -116,7 +118,7 @@ fun SpaceScreenContent(
                     exit = fadeOut() + scaleOut() + shrinkVertically(),
                 ) {
                     Box(Modifier.fillMaxWidth(), Alignment.Center) {
-                        BasicText("No files or directories")
+                        Text("No files or directories")
                     }
                 }
 

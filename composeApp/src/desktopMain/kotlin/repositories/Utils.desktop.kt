@@ -11,5 +11,4 @@ private val appDirs by lazy {
 fun getAppDataDir(): String =
     appDirs.getUserDataDir("Secure Vault", "1.0.0", "zhelenskiy")
 
-
 actual fun pathTo(vararg ids: String): String = (Paths.get(getAppDataDir(), *ids)).absolutePathString()

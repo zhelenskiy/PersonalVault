@@ -20,6 +20,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
@@ -122,6 +123,8 @@ fun FileEditorScreenContent(
                     IconButton(onClick = onHomePress) {
                         Icon(Icons.Default.Home, contentDescription = "To start page")
                     }
+                    
+                    ColorSchemeConfigurationButton()
                 },
             )
         },
@@ -247,11 +250,12 @@ private fun PlainTextFileEditor(
     fontSize: TextUnit = MaterialTheme.typography.bodyLarge.fontSize,
     onTextFieldValueChange: (TextFieldValue) -> Unit
 ) {
-    val textStyle = TextStyle.Default.copy(fontFamily = fontFamily, fontSize = fontSize)
+    val textStyle = TextStyle.Default.copy(fontFamily = fontFamily, fontSize = fontSize, color = MaterialTheme.colorScheme.onBackground)
     BasicTextField(
         value = textFieldValue,
         onValueChange = onTextFieldValueChange,
         textStyle = textStyle,
+        cursorBrush = SolidColor(textStyle.color),
         decorationBox = { innerTextField ->
             Box(
                 modifier = Modifier
@@ -503,10 +507,11 @@ private fun MarkedUpTextFileEditor(
                     )
                 }
             }
+            val textColor = MaterialTheme.colorScheme.onBackground
             val html = when (fileType) {
                 MarkupTextFileType.Html, MarkupTextFileType.Htm -> textFieldValue.text
-                MarkupTextFileType.Markdown -> rememberSaveable(textFieldValue.text) {
-                    convertMarkdownToHtml(textFieldValue.text)
+                MarkupTextFileType.Markdown -> rememberSaveable(textFieldValue.text, textColor) {
+                    convertMarkdownToHtml(textFieldValue.text, textColor)
                 }
             }
 
@@ -590,7 +595,7 @@ private fun RowScope.CopyHtmlIconButton(
     }
 }
 
-private fun convertMarkdownToHtml(markdown: String): String {
+private fun convertMarkdownToHtml(markdown: String, textColor: Color? = null): String {
     val flavour = GFMFlavourDescriptor()
     val parsedTree = MarkdownParser(flavour).buildMarkdownTreeFromString(markdown)
     val head = """
@@ -601,6 +606,7 @@ private fun convertMarkdownToHtml(markdown: String): String {
             body {
                 font-family: 'Roboto', sans-serif;
             }
+            ${if (textColor != null) "body { color: ${textColor.toArgbString()}; }" else ""}
         </style>
         </head>
     """.trimIndent()

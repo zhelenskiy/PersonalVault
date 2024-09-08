@@ -21,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.platform.LocalDensity
@@ -262,7 +263,7 @@ fun RowScope.CardTextField(
     Box(modifier.weight(1f).padding(start = 8.dp)) {
         val textMeasurer = rememberTextMeasurer()
         var width by remember { mutableStateOf<Int?>(null) }
-        val textStyle = MaterialTheme.typography.titleMedium
+        val textStyle = MaterialTheme.typography.titleMedium.copy(color = MaterialTheme.colorScheme.onSurface)
         val density = LocalDensity.current
         val emptyText = "Untitled"
         LaunchedEffect(value) {
@@ -297,6 +298,7 @@ fun RowScope.CardTextField(
             interactionSource = interactionSource,
             enabled = enabled,
             singleLine = singleLine,
+            cursorBrush = SolidColor(textStyle.color),
             decorationBox = { innerTextField ->
                 TextFieldDefaults.DecorationBox(
                     value = value,
