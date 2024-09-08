@@ -515,6 +515,15 @@ private fun MarkedUpTextFileEditor(
                 }
             }
 
+            var previousAndCurrentTextFieldTexts by remember { mutableStateOf("" to textFieldValue.text) }
+            LaunchedEffect(textFieldValue.text) {
+                if (previousAndCurrentTextFieldTexts.second != textFieldValue.text) {
+                    previousAndCurrentTextFieldTexts = previousAndCurrentTextFieldTexts.second to textFieldValue.text
+                }
+            }
+            val previousTextFieldText = previousAndCurrentTextFieldTexts.first
+            val appending = textFieldValue.text.startsWith(previousTextFieldText)
+
             if (mode == MarkedUpTextFileEditorMode.Both) {
                 Spacer(
                     modifier = Modifier
@@ -535,6 +544,7 @@ private fun MarkedUpTextFileEditor(
                         HtmlView(
                             html = html,
                             backgroundColor = backgroundColor,
+                            appended = appending,
                             modifier = Modifier.fillMaxSize(),
                         )
                     }
@@ -923,4 +933,4 @@ private fun TextFieldValue.wrapList(
 }
 
 @Composable
-expect fun HtmlView(html: String, backgroundColor: Color, modifier: Modifier)
+expect fun HtmlView(html: String, backgroundColor: Color, appended: Boolean, modifier: Modifier)

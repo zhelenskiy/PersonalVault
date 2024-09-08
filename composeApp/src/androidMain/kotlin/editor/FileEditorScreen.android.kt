@@ -1,6 +1,7 @@
 package editor
 
 import android.content.Intent
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.drawable.PictureDrawable
@@ -19,20 +20,29 @@ import androidx.core.content.FileProvider
 import com.caverock.androidsvg.SVG
 import com.caverock.androidsvg.SVGImageView
 import common.File
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 import repositories.appContext
 import java.io.ByteArrayInputStream
 import java.nio.file.Files
 import androidx.compose.ui.graphics.Color as ComposeColor
 
 
-private data class ScrollPosition(val x: Float, val y: Float)
+private data class ScrollPosition(val x: Int, val y: Int)
 
 @Composable
-actual fun HtmlView(html: String, backgroundColor: ComposeColor, modifier: Modifier) {
-    var scrollPosition by remember { mutableStateOf(ScrollPosition(0f, 0f)) }
+actual fun HtmlView(html: String, backgroundColor: ComposeColor, appended: Boolean, modifier: Modifier) {
+    val htmls = remember { MutableStateFlow(html) }
+    LaunchedEffect(html) {
+        htmls.value = html
+    }
+    val coroutineScope = rememberCoroutineScope()
     AndroidView(
         factory = { context ->
             WebView(context).apply {
+                var pageLoads = 0
+                var scrollPosition = ScrollPosition(0, 0)
+
                 setBackgroundColor(Color.TRANSPARENT)
                 settings.javaScriptEnabled = true
                 webViewClient = object : WebViewClient() {
@@ -41,24 +51,39 @@ actual fun HtmlView(html: String, backgroundColor: ComposeColor, modifier: Modif
                         return true
                     }
 
-                    override fun onPageFinished(view: WebView, url: String?) {
-                        evaluateJavascript("window.scrollTo(${scrollPosition.x}, ${scrollPosition.y})") {}
+                    override fun onPageCommitVisible(view: WebView, url: String?) {
+                        // There is overscroll in Android for some reason, so I can ignore appended flag
+                        scrollTo(scrollPosition.x, scrollPosition.y)
+                        pageLoads--
+                    }
+
+                    override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
+                        pageLoads++
+                        super.onPageStarted(view, url, favicon)
                     }
                 }
                 loadData(html, "text/html", "UTF-8")
                 settings.useWideViewPort = true
+                overScrollMode = WebView.OVER_SCROLL_NEVER
 
-                setOnScrollChangeListener { _, _, _, _, _ ->
-                    evaluateJavascript("document.body.scrollTop") { vertical ->
-                        evaluateJavascript("document.documentElement.scrollLeft") { horizontal ->
-                            scrollPosition = ScrollPosition(horizontal.toFloat(), vertical.toFloat())
-                        }
+                setOnScrollChangeListener { _, scrollX, scrollY, oldScrollX, oldScrollY ->
+                    val delta = 100
+                    if (pageLoads != 0 || scrollX == 0 && scrollY == 0 && (oldScrollX > delta || oldScrollY > delta)) {
+                        // some flaky bug that scrollX and scrollY are set to 0
+                        return@setOnScrollChangeListener
+                    }
+                    scrollPosition = ScrollPosition(scrollX, scrollY)
+                }
+                coroutineScope.launch {
+                    htmls.collect {
+                        pageLoads++
+                        loadData(it, "text/html", "UTF-8")
+                        pageLoads--
                     }
                 }
             }
         },
         modifier = modifier.background(backgroundColor),
-        update = { it.loadData(html, "text/html", "UTF-8") }
     )
 }
 

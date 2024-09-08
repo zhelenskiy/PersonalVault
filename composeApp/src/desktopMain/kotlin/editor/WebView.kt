@@ -77,8 +77,9 @@ body {
 @Composable
 fun DesktopWebView(
     modifier: Modifier,
-    backgroundColor: androidx.compose.ui.graphics.Color? = null,
+    backgroundColor: Color? = null,
     html: String,
+    appended: Boolean,
 ) {
 
     remember { JFXPanel() }
@@ -93,6 +94,7 @@ fun DesktopWebView(
                 backgroundColor = backgroundColor,
                 onScrollPosition = { scrollPositions = it },
                 onWebView = { webView = it },
+                appended = appended,
             )
         },
         modifier = modifier,
@@ -109,12 +111,18 @@ fun DesktopWebView(
 
 fun fakeWebView() {
     JFXPanel()
-    makeWebViewPanel {}
+    makeWebViewPanel(onWebView = {})
 }
 
 private data class Position(val vertical: Int, val horizontal: Int)
 
-private fun makeWebViewPanel(scrollPosition: () -> Position? = { null }, backgroundColor: androidx.compose.ui.graphics.Color? = null, onScrollPosition: (Position) -> Unit = { }, onWebView: (WebView) -> Unit): JFXPanel =
+private fun makeWebViewPanel(
+    scrollPosition: () -> Position? = { null },
+    backgroundColor: Color? = null,
+    onScrollPosition: (Position) -> Unit = { },
+    appended: Boolean = false,
+    onWebView: (WebView) -> Unit,
+): JFXPanel =
     JFXPanel().apply {
         Platform.runLater {
             val webView = WebView().apply {
@@ -146,7 +154,14 @@ private fun makeWebViewPanel(scrollPosition: () -> Position? = { null }, backgro
                         }
                         
                         scrollPosition()?.let {
-                            engine.executeScript("window.scrollTo(${it.horizontal}, ${it.vertical})")
+                            if (appended) {
+                                engine.executeScript("window.scrollTo(${it.horizontal}, document.body.scrollHeight)")
+                                val height = engine.executeScript("document.body.scrollHeight") as? Int
+                                if (height != null) onScrollPosition(it.copy(vertical = height))
+                            } else {
+                                engine.executeScript("window.scrollTo(${it.horizontal}, ${it.vertical})")
+                                Unit
+                            }
                         }
                     }
                 }
