@@ -293,12 +293,11 @@ fun FileSystem(
 
     var isLastElementNew by remember { mutableStateOf(false) }
 
-    fun changeRootByChangesInsideCurrentFolder(
+    val changeRootByChangesInsideCurrentFolder = fun (
         newMapping: PersistentMap<FileId, File?>,
-        customPath: List<Int> = path,
         change: PersistentList<RegularFileSystemItem>.() -> PersistentList<RegularFileSystemItem>,
     ) {
-        val newChildren = changeRootByChangesInsideCurrentFolderImpl(root.children, customPath, 0, change)
+        val newChildren = changeRootByChangesInsideCurrentFolderImpl(root.children, path, 0, change)
         val newRoot = Root(newChildren)
         if (root != newRoot || files != newMapping) {
             onChange(newRoot, newMapping)
@@ -343,10 +342,7 @@ fun FileSystem(
                 }
             },
             changeRootByChangesInsideCurrentFolder = { mapping, change ->
-                changeRootByChangesInsideCurrentFolder(
-                    mapping,
-                    change = change
-                )
+                changeRootByChangesInsideCurrentFolder(mapping, change)
             }
         )
         val animationSpec = remember { spring<IntOffset>() }
@@ -391,7 +387,7 @@ fun FileSystem(
                     }
                     itemsIndexed(children, key = { _, child -> child.fileId }) { index, child ->
                         ReorderableItem(reorderableLazyListState, key = child.fileId) { isDragging ->
-                            fun moveToShort(newPath: List<Int>) {
+                            val moveToShort = fun (newPath: List<Int>) {
                                 val success = moveTo(
                                     spaceStructure = spaceStructure, oldPath = path,
                                     newPath = newPath, index = index, currentElement = child,
@@ -409,7 +405,7 @@ fun FileSystem(
                                 }
                             }
 
-                            fun copyToShort(newPath: List<Int>) {
+                            val copyToShort = fun (newPath: List<Int>) {
                                 val success = copyTo(spaceStructure, newPath, child, onChange)
                                 if (success) {
                                     coroutineScope.launch {
@@ -435,8 +431,8 @@ fun FileSystem(
                                     spaceName = spaceName,
                                     spaceStructure = spaceStructure,
                                     path = path,
-                                    moveTo = ::moveToShort,
-                                    copyTo = ::copyToShort,
+                                    moveTo = moveToShort,
+                                    copyTo = copyToShort,
                                     isNewDirectory = index == children.lastIndex && isLastElementNew,
                                     onCreationFinished = { isLastElementNew = false },
                                     modifier = Modifier.draggableHandle(enabled = blockingFiles.isEmpty() && !viewOnly),
@@ -457,8 +453,8 @@ fun FileSystem(
                                     snackbarHostState = snackbarHostState,
                                     blockingFiles = blockingFiles,
                                     viewOnly = viewOnly,
-                                    moveTo = ::moveToShort,
-                                    copyTo = ::copyToShort,
+                                    moveTo = moveToShort,
+                                    copyTo = copyToShort,
                                     isNewFile = index == children.lastIndex && isLastElementNew,
                                     onCreationFinished = { isLastElementNew = false },
                                     modifier = Modifier.draggableHandle(enabled = blockingFiles.isEmpty() && !viewOnly),
@@ -539,7 +535,7 @@ fun NavigationRow(
     val density = LocalDensity.current
     val wideButtons = path.isEmpty() && children.isEmpty()
     var animateContentWidth by remember { mutableStateOf(true) }
-    fun Modifier.switchableAnimateContentWidth() = if (animateContentWidth) animateContentWidth() else this
+    val switchableAnimateContentWidth = fun Modifier.() = if (animateContentWidth) animateContentWidth() else this
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.onSizeChanged { wholeRowWidth = density.run { it.width.toDp() } }.fillMaxWidth(),

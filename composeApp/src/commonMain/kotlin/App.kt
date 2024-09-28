@@ -45,19 +45,28 @@ expect val dynamicDarkColorScheme: ColorScheme?
     @Composable
     get
 
-private val colorScheme: ColorScheme
+private val currentColorSchemeConfiguration: ColorSchemeConfiguration
     @Composable
     get() {
         val configurationRepository by localDI().instance<ConfigurationRepository>()
         val configuration by configurationRepository.configurationFlow.collectAsState()
-        val currentColorSchemeConfiguration = configuration.colorSchemeConfiguration
+        return configuration.colorSchemeConfiguration
+    }
+
+val isDarkTheme: Boolean
+    @Composable
+    get() = when (currentColorSchemeConfiguration.type) {
+        ColorSchemeType.Light -> false
+        ColorSchemeType.Dark -> true
+        ColorSchemeType.System -> isSystemInDarkTheme()
+    }
+
+private val colorScheme: ColorScheme
+    @Composable
+    get() {
         val lightColorScheme = dynamicLightColorScheme.takeIf { currentColorSchemeConfiguration.useDynamic } ?: staticLightColorScheme
         val darkColorScheme = dynamicDarkColorScheme.takeIf { currentColorSchemeConfiguration.useDynamic } ?: staticDarkColorScheme
-        return when (currentColorSchemeConfiguration.type) {
-            ColorSchemeType.Light -> lightColorScheme
-            ColorSchemeType.Dark -> darkColorScheme
-            ColorSchemeType.System -> if (isSystemInDarkTheme()) darkColorScheme else lightColorScheme
-        }
+        return if (isDarkTheme) darkColorScheme else lightColorScheme
     }
 
 @Composable

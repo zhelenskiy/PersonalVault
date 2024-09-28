@@ -28,7 +28,6 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.input.getSelectedText
 import androidx.compose.ui.unit.DpSize
@@ -44,6 +43,7 @@ import com.godaddy.android.colorpicker.HsvColor
 import common.*
 import common.FileSystemItem.FileId
 import crypto.PrivateKey
+import isDarkTheme
 import kotlinlang.compose.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -224,15 +224,15 @@ fun TextFileEditor(file: TextFile, onFileChanged: (TextFile) -> Unit, snackbarHo
         )
 
         is SourceCodeFile -> if (file.type.extension.lowercase() in listOf("kt", "kts")) {
+            val buttonColorScheme = ReplaceButtonsColorScheme(
+                backgroundColor = ButtonDefaults.buttonColors().containerColor,
+                textColor = ButtonDefaults.buttonColors().contentColor
+            )
+            val colorScheme = if (isDarkTheme) makeDarkColorScheme(buttonColorScheme) else makeLightColorScheme(buttonColorScheme)
             KotlinSourceEditor(
                 textFieldValue = textFieldValue,
                 onTextFieldValueChange = onTextFieldValueChange,
-                colorScheme = makeLightColorScheme(
-                    ReplaceButtonsColorScheme(
-                        backgroundColor = ButtonDefaults.buttonColors().containerColor,
-                        textColor = ButtonDefaults.buttonColors().contentColor
-                    )
-                ),
+                colorScheme = colorScheme,
                 modifier = Modifier.fillMaxHeight(),
                 sourceEditorFeaturesConfiguration = KotlinSourceEditorFeaturesConfiguration(),
                 snackbarHostState = snackbarHostState,
@@ -381,7 +381,7 @@ private fun MarkedUpTextFileEditor(
                     var showForegroundColorPicker by rememberSaveable { mutableStateOf(false) }
                     var showBackgroundColorPicker by rememberSaveable { mutableStateOf(false) }
                     val density = LocalDensity.current
-                    fun BoxWithConstraintsScope.colorPickerOffset() = density.run {
+                    val colorPickerOffset = fun BoxWithConstraintsScope.() = density.run {
                         IntOffset(
                             x = -128.dp.roundToPx(), // because of https://github.com/JetBrains/compose-multiplatform/issues/1062
                             y = (maxHeight + 8.dp).roundToPx()

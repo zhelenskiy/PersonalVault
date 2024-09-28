@@ -146,7 +146,7 @@ fun SpaceListScreenContent(
             }
             spacesToIds -= spacesToDelete
         }
-        fun getOrPutId(space: EncryptedSpaceInfo): Long {
+        val getOrPutId = fun (space: EncryptedSpaceInfo): Long {
             spacesToIds[space]?.let { return it }
             val id = generateSequence { Random.nextLong() }.dropWhile { it in spacesToIds.values }.first()
             spacesToIds = spacesToIds.put(space, id)
@@ -340,7 +340,7 @@ fun NewSpaceDialog(
     val isCorrect = passwordCopyIsCorrect && passwordIsCorrect && nameIsCorrect
     var isLoading by rememberSaveable { mutableStateOf(false) }
     val isSuccess = isCorrect && !isLoading
-    fun onSucess() {
+    val onSuccess = fun () {
         coroutineScope.launch {
             try {
                 isLoading = true
@@ -405,7 +405,7 @@ fun NewSpaceDialog(
                         labelText = "Repeat password",
                         isPassword = true,
                         imeAction = ImeAction.Done,
-                        onImeAction = { if (isSuccess) onSucess() },
+                        onImeAction = { if (isSuccess) onSuccess() },
                         focusRequester = passwordCopyFocusRequester,
                         trailingIcon = {
                             TextFieldTrailingErrorIcon(!passwordCopyIsCorrect, "Password and its copy do not match")
@@ -418,7 +418,7 @@ fun NewSpaceDialog(
             }
         },
         confirmButton = {
-            Button(onClick = ::onSucess, enabled = isSuccess) {
+            Button(onClick = onSuccess, enabled = isSuccess) {
                 Text("Confirm")
             }
         },
@@ -449,7 +449,7 @@ fun EditSpaceDialog(
     var showWrongOldPassword by rememberSaveable(oldPassword) { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
 
-    fun onSuccess() {
+    val onSuccess = fun () {
         coroutineScope.launch {
             try {
                 isLoading = true
@@ -555,7 +555,7 @@ fun EditSpaceDialog(
             }
         },
         confirmButton = {
-            Button(onClick = ::onSuccess, enabled = isSuccess) {
+            Button(onClick = onSuccess, enabled = isSuccess) {
                 Text("Confirm")
             }
         },
@@ -627,7 +627,7 @@ fun OpenSpaceDialog(
     val passwordIsValid = password.length >= minPasswordLength
     val isSuccess = passwordIsValid && !isLoading
 
-    fun onSuccess() {
+    val onSuccess = fun () {
         coroutineScope.launch {
             try {
                 isLoading = true
@@ -685,7 +685,7 @@ fun OpenSpaceDialog(
             }
         },
         confirmButton = {
-            Button(enabled = isSuccess, onClick = ::onSuccess) {
+            Button(enabled = isSuccess, onClick = onSuccess) {
                 Text("Confirm")
             }
         },
