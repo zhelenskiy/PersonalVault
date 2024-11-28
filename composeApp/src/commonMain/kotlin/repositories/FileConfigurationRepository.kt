@@ -8,11 +8,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import okio.Path.Companion.toPath
+import kotlinx.io.files.Path
 import kotlin.coroutines.EmptyCoroutineContext
 
 object FileConfigurationRepository : ConfigurationRepository {
-    private val kstore: KStore<Configuration> = storeOf(file = pathTo("configuration.json").toPath().withCreatedParents())
+    private val kstore: KStore<Configuration> = storeOf(file = Path(pathTo("configuration.json")).withCreatedParents())
     override val configurationFlow: StateFlow<Configuration> = kstore.updates
         .map { it ?: Configuration() }
         .stateIn(configurationSaveScope, SharingStarted.Eagerly, Configuration())

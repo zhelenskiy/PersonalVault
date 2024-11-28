@@ -284,7 +284,7 @@ fun RowScope.CardTextField(
             textStyle = textStyle,
             keyboardOptions = KeyboardOptions(
                 capitalization = KeyboardCapitalization.Sentences,
-                autoCorrect = true,
+                autoCorrectEnabled = true,
                 keyboardType = KeyboardType.Text,
                 imeAction = ImeAction.Done,
             ),

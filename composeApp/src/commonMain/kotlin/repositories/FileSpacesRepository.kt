@@ -8,15 +8,14 @@ import kotlinx.collections.immutable.toPersistentList
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import okio.Path.Companion.toPath
+import kotlinx.io.files.Path
 import kotlin.coroutines.EmptyCoroutineContext
-import kotlin.io.path.createDirectories
 
 private const val firstCounterValue = Long.MIN_VALUE
 
 class FileSpacesRepository : SpacesRepository {
     private val kStore: KStore<Versioned<List<EncryptedSpaceInfo>>> =
-        storeOf(file = pathTo("spaces.json").toPath().withCreatedParents().also { println("Data: $it") })
+        storeOf(file = Path(pathTo("spaces.json")).withCreatedParents().also { println("Data: $it") })
 
     private val spacesSavingScope: CoroutineScope = CoroutineScope(EmptyCoroutineContext)
 

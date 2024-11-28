@@ -8,5 +8,5 @@ actual fun Modifier.onExternalSpaces(
     enabled: Boolean,
     onDraggingChange: (Boolean) -> Unit,
     whenDraging: @Composable Modifier.() -> Modifier,
-    onSpace: (List<EncryptedSpaceInfo>) -> Unit
+    onSpaces: (List<EncryptedSpaceInfo>) -> Unit
 ): Modifier = this

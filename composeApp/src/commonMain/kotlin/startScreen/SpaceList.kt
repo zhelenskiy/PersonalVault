@@ -320,7 +320,7 @@ expect fun Modifier.onExternalSpaces(
     enabled: Boolean = true,
     onDraggingChange: (Boolean) -> Unit = { },
     whenDraging: @Composable Modifier.() -> Modifier = { this },
-    onSpace: (List<EncryptedSpaceInfo>) -> Unit,
+    onSpaces: (List<EncryptedSpaceInfo>) -> Unit,
 ): Modifier
 
 @Composable
@@ -716,7 +716,7 @@ fun AccountDialogTextField(
     keyboardOptions = KeyboardOptions(
         imeAction = imeAction,
         capitalization = if (isPassword) KeyboardCapitalization.None else KeyboardCapitalization.Sentences,
-        autoCorrect = !isPassword,
+        autoCorrectEnabled = !isPassword,
         keyboardType = if (isPassword) KeyboardType.Password else KeyboardType.Text,
     ),
     keyboardActions = KeyboardActions(
